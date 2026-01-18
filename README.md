@@ -1,6 +1,58 @@
 # job_agent
 Job Search Agent
 # Job Agent
+## Project Status (Ground Truth — Do Not Relitigate)
+
+This repository contains a **working v1 job-search agent** with the following **already-solved invariants**. These decisions are intentional and should not be reworked without explicit user direction.
+
+### Solved & Locked Decisions
+
+**Gmail ingestion**
+- Gmail OAuth + message fetching works
+- We do NOT use Gmail snippets
+- Job URLs are extracted from the decoded `text/html` email body
+- Extraction logic:
+  - Walk `payload.parts`
+  - Decode `text/html` MIME part (base64url)
+  - Extract `<a href="...">` links
+  - Filter to:
+    - `linkedin.com/jobs/view/`
+    - `linkedin.com/comm/jobs/view/`
+  - Canonicalize by stripping everything after `?`
+- This logic was previously debugged and confirmed working (≈20–30 URLs/run)
+
+**LLM usage constraints (to avoid context-window errors)**
+- LLM calls are batched
+- Constants:
+  - `MAX_JOBS_PER_LLM_CALL = 10`
+  - `MAX_JOB_DESCRIPTION_CHARS = 6000`
+- Jobs beyond the batch limit are processed in batches
+- This is mandatory; do not remove batching
+
+**Current limitation (known and intentional)**
+- LLM currently receives only metadata + URLs
+- Job page fetching has NOT been implemented yet
+- As a result, scoring quality is expected to be low until job pages are fetched
+
+### Source of Truth
+- Google Sheet will be the source of truth for:
+  - deduplication
+  - fetch status
+  - scoring outputs
+- Local SQLite is for experimentation only
+
+### What Comes Next (v1 continuation)
+- Fetch job posting pages (LinkedIn first)
+- Extract:
+  - job_description
+  - company
+  - role_title
+  - apply_url
+- Respect:
+  - per-URL timeout
+  - overall run time budget
+  - resume via Sheet (`fetch_status`)
+
 
 An extensible, AI-powered job search agent designed to identify **high-leverage Product Operations / Technical Program Management / Chief of Staff–type roles** in ambiguous, growth-stage environments.
 
