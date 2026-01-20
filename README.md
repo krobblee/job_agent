@@ -147,6 +147,48 @@ Copy code
 - New sources can be added without changing the agent logic
 
 ---
+## Job Page Fetching (v1)
+
+Job page fetching is a required pipeline stage that runs after URL extraction and before scoring. The Google Sheet is the single source of truth and controls resume behavior across runs.
+
+### fetch_status (v1 contract)
+
+This enum is locked for v1 and must not be silently changed.
+
+pending  
+Discovered, not fetched yet.
+
+fetched  
+HTTP succeeded and at least one of `role_title` or `job_description` was extracted.
+
+failed  
+Fetch attempted but failed due to HTTP error, parse error, or empty parse.
+
+timeout  
+Per-URL timeout or overall run budget exceeded.
+
+### Parse failure rule
+
+If the HTTP request succeeds but neither `role_title` nor `job_description` is extracted, the row must be marked as `failed` with `fetch_error = "parse_empty"`.
+
+### Retry semantics
+
+MAX_FETCH_ATTEMPTS = 3
+
+Rows in `pending`, `failed`, or `timeout` may be retried up to the attempt cap. `fetched` is terminal for v1.
+
+### Required system-owned columns
+
+fetch_status  
+fetch_attempts  
+last_fetch_at  
+fetch_error (nullable)
+
+### Scoring invariant
+
+Scoring must only run for rows where `fetch_status == "fetched"`. Email-derived context must not be scored once job-page fetching is implemented.
+
+---
 
 ## 📦 Core Data Model
 

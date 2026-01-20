@@ -98,6 +98,46 @@ Do **not** remove batching or truncation.
 - Code-fence stripping is required before parsing
 - Pydantic validation expects clean JSON only
 
+## Job Page Fetching + Resume Contract (v1)
+
+This section defines job-page fetching as a required step before downstream processing. It does not modify Gmail ingestion, URL extraction, or scoring logic.
+
+### Purpose
+
+Job-page fetching exists to replace email-derived context with page-derived data, while preserving resumability and explicit failure states via the Google Sheet.
+
+### fetch_status contract
+
+The following enum is authoritative for v1:
+
+pending  
+Discovered, not fetched yet.
+
+fetched  
+HTTP succeeded and at least one of `role_title` or `job_description` was extracted.
+
+failed  
+Fetch attempted but failed due to HTTP error, parse error, or empty parse.
+
+timeout  
+Per-URL timeout or overall run budget exceeded.
+
+### Explicit parse rule
+If HTTP succeeds but extraction yields neither `role_title` nor `job_description`, the row must be marked as `failed` and `fetch_error` must be set to `parse_empty`.
+
+### Retry policy
+MAX_FETCH_ATTEMPTS = 3
+Rows in `pending`, `failed`, or `timeout` are retryable up to the attempt cap. `fetched` is terminal for v1.
+
+### Invariants
+
+No silent drops.  
+Resume behavior is driven solely by Sheet state.  
+Scoring must only consume rows with `fetch_status == fetched`.
+
+Once implemented, this contract is part of v1 and must not be altered without an explicit version change.
+
+
 ### Source of truth
 - Google Sheet is authoritative for:
   - deduplication
