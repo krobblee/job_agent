@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import os
 
-from job_agent.agent import rank_jobs
-from job_agent.db import init_db
-from job_agent.gmail_client import extract_jobs_from_email, fetch_messages, get_gmail_service
+from agent.agent import rank_jobs
+from agent.db import init_db
+from agent.gmail_client import extract_jobs_from_email, fetch_messages, get_gmail_service
 
 
 def main() -> None:
@@ -12,10 +12,13 @@ def main() -> None:
 
     query = os.getenv(
         "GMAIL_QUERY",
-        '(subject:"job alert" OR subject:"recommended jobs") newer_than:3d',
+        'from:(jobalerts-noreply@linkedin.com) newer_than: 7d'
     )
 
+
+
     service = get_gmail_service()
+    print("GMAIL_QUERY =", query)
     messages = fetch_messages(query)
     print(f"Fetched {len(messages)} messages")
 

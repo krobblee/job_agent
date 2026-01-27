@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from job_agent.config import DB_PATH
+from agent.config import DB_PATH
 
 
 def init_db() -> None:

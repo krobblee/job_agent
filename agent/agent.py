@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from job_agent.config import PROFILE, client
-from job_agent.models import AgentDigest, Job
+from agent.config import PROFILE, client
+from agent.models import AgentDigest, Job
 
 
 def build_prompt(jobs: list[Job]) -> str:
@@ -36,14 +36,25 @@ def rank_jobs(jobs: list[Job]) -> tuple[AgentDigest, str]:
     MAX_JOBS_PER_LLM_CALL = 10
     MAX_JOB_DESCRIPTION_CHARS = 6000
 
+    # v1 contract: only score rows that have been fetched from the job page
+    eligible = [j for j in jobs if getattr(j, "fetch_status", None) == "fetched"]
+
+    skipped = len(jobs) - len(eligible)
+    if skipped:
+        print(f"[rank_jobs] Skipping {skipped} jobs not fetched yet (fetch_status != 'fetched').")
+
+    if not eligible:
+        empty = AgentDigest(top=[], rejects=[], notes=["No fetched jobs available to score yet."])
+        return empty, ""
+
     all_top = []
     all_rejects = []
     all_notes = []
     last_raw = ""
 
-    for i in range(0, len(jobs), MAX_JOBS_PER_LLM_CALL):
+    for i in range(0, len(eligible), MAX_JOBS_PER_LLM_CALL):
         batch = []
-        for j in jobs[i : i + MAX_JOBS_PER_LLM_CALL]:
+        for j in eligible[i : i + MAX_JOBS_PER_LLM_CALL]:
             j_copy = j.model_copy()
             if j_copy.job_description:
                 j_copy.job_description = j_copy.job_description[:MAX_JOB_DESCRIPTION_CHARS]

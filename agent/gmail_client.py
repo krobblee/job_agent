@@ -13,8 +13,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-from job_agent.config import GMAIL_SCOPES
-from job_agent.models import Job
+from agent.config import GMAIL_SCOPES
+from agent.models import Job
 
 
 def get_gmail_service():
