@@ -123,17 +123,17 @@ Dedup occurs before writing to the sheet
 
 Agent outputs:
 
-agent_bucket: True Match / Monitor / Reject
+agent_bucket: True Match / Monitor / Reject (categorical, NO numeric scoring)
 
-agent_score: 0–100
+agent_reasoning: 2-4 bullet points explaining the bucket decision
 
 Reasoning rules:
 
-True Match + Reject: bucket + score only
+- True Match: Strong fit, apply immediately
+- Monitor: Partial fit, keep watching
+- Reject: Not a good fit, skip
 
-Monitor: bucket + score + one-line explanation
-
-Rejects are written to the sheet with scores.
+All buckets include reasoning. Rejects are written to the sheet with reasoning.
 
 4.5 Hard NOs
 
@@ -168,11 +168,9 @@ first_seen_date
 
 Agent output
 
-agent_bucket
+agent_bucket (true_match, monitor, or reject)
 
-agent_score
-
-agent_reasoning (Monitor only)
+agent_reasoning (2-4 bullets for all buckets)
 
 agent_flags
 
