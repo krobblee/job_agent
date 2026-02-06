@@ -1,0 +1,154 @@
+# Job Agent — Handoff V3
+## Job Page Fetcher Implementation
+
+This handoff covers the implementation of job-page fetching and Sheet updates,
+building on the locked contracts defined in README.md and HANDOFF_V2.md.
+
+This document is procedural and execution-focused.
+It does not define new invariants.
+
+---
+
+## Preconditions (already verified)
+
+The following are confirmed working and must be assumed true:
+
+- Gmail ingestion works and returns LinkedIn job URLs
+- URLs are written to the Google Sheet as rows with `fetch_status = pending`
+- Google Sheet is the single source of truth
+- `fetch_status` lifecycle and retry semantics are locked (see HANDOFF_V2)
+- Scoring is gated and will skip non-fetched rows
+
+This handoff does **not** revisit:
+- Gmail auth
+- Gmail query construction
+- URL extraction
+- Sheet schema
+- Scoring design
+
+---
+
+## Goal of this handoff
+
+Implement a job-page fetcher that:
+
+1. Reads `pending` rows from the Sheet
+2. Fetches job pages safely
+3. Extracts structured job data
+4. Updates Sheet rows with results
+5. Supports retries and resume across runs
+
+The output of this handoff is a working end-to-end loop:
+
+Gmail → Sheet (pending) → Fetch → Sheet (fetched / failed / timeout) → Score
+
+---
+
+## Fetcher responsibilities
+
+The fetcher must, for each eligible row:
+
+### Input conditions
+
+- `fetch_status == "pending"`
+- `fetch_attempts < MAX_FETCH_ATTEMPTS`
+
+### Fetch behavior
+
+- Perform HTTP GET with:
+  - per-URL timeout
+  - basic error handling
+- Increment `fetch_attempts` on each attempt
+- Record `last_fetch_at` for every attempt
+
+### Parsing requirements
+
+- Extract at minimum:
+  - `job_description` OR
+  - `role_title`
+- If neither can be extracted:
+  - mark row as `failed`
+  - set `fetch_error = "parse_empty"`
+
+### Output states
+
+- On success:
+  - `fetch_status = "fetched"`
+  - populate extracted fields
+- On HTTP or parse failure:
+  - `fetch_status = "failed"`
+  - populate `fetch_error`
+- On timeout:
+  - `fetch_status = "timeout"`
+
+---
+
+## Resume behavior
+
+The fetcher must be safe to rerun.
+
+Across runs:
+
+- Rows already marked `fetched` must not be refetched
+- Rows marked `failed` or `timeout` may be retried until retry cap is reached
+- Resume decisions must be driven entirely by Sheet state
+
+No in-memory state should be required to resume.
+
+---
+
+## Non-goals for this handoff
+
+This handoff explicitly does **not** include:
+
+- Concurrency or parallel fetching
+- Background scheduling
+- Scoring logic changes
+- Fetching pages already marked `fetched`
+- Schema changes to the Sheet
+- Performance optimization beyond correctness
+
+---
+
+## Success criteria
+
+This handoff is complete when:
+
+- Pending rows transition correctly to fetched / failed / timeout
+- Retry counts increment correctly
+- Fetching resumes correctly after interruption
+- Scoring runs only after fetch completion
+- No silent drops occur
+
+---
+
+## What remains open after this handoff
+
+Intentionally left undefined:
+
+- Scoring rubric and logic
+- Model choice for scoring
+- Ranking vs filtering semantics
+- Feedback loops into discovery or fetching
+
+These will be addressed in a later handoff.
+
+---
+
+## Working style and interaction constraints
+
+This handoff assumes a highly structured, incremental working style.
+
+The implementation chat must follow these rules:
+
+- Proceed **one step at a time**
+- Do not batch multiple implementation steps into a single response
+- Explicitly stop and wait for confirmation before moving to the next step
+- Do not re-litigate decisions already locked in README.md or HANDOFF_V2.md
+- Ask before introducing new abstractions, files, or refactors
+- Prefer concrete code or exact file-level instructions over conceptual discussion
+- Avoid speculative optimizations or future-looking design during v1 implementation
+
+If uncertainty exists about whether something is already decided, ask explicitly before acting.
+
+The goal of this handoff is steady, inspectable progress — not speed.
