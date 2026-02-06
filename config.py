@@ -11,10 +11,13 @@ load_dotenv()
 # OpenAI client is intentionally created once and imported where needed.
 client = OpenAI()
 
-DB_PATH = os.getenv("DB_PATH", "jobs.db")
-
 # Gmail API scope (readonly for v1)
 GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+# Google Sheet ID (source of truth for job tracking)
+SHEET_ID = os.getenv("SHEET_ID")
+if not SHEET_ID:
+    raise ValueError("SHEET_ID must be set in .env file")
 
 PROFILE = """
 Candidate profile (high level):
