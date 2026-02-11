@@ -106,6 +106,10 @@ def rank_jobs(jobs: list[Job]) -> tuple[AgentDigest, str]:
             cleaned = cleaned.strip("`")
             cleaned = cleaned.replace("json", "", 1).strip()
 
+        # Remove control characters that break JSON parsing
+        import re
+        cleaned = re.sub(r'[\x00-\x1f\x7f]', '', cleaned)
+
         digest = AgentDigest.model_validate_json(cleaned)
         if isinstance(digest.notes, str):
             digest.notes = [digest.notes]
