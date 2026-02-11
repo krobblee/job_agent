@@ -38,7 +38,7 @@ class AgentDigest(BaseModel):
     
     Contains all scored jobs organized by bucket.
     """
-    true_matches: List[ScoredJob]  # Jobs to apply to immediately
-    monitor: List[ScoredJob]  # Jobs to keep an eye on
-    rejects: List[ScoredJob]  # Jobs to skip
-    notes: Union[List[str], str]  # General observations/suggestions
+    true_matches: List[ScoredJob] = []  # Jobs to apply to immediately
+    monitor: List[ScoredJob] = []  # Jobs to keep an eye on
+    rejects: List[ScoredJob] = []  # Jobs to skip
+    notes: Union[List[str], str] = []  # General observations/suggestions
