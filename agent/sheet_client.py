@@ -41,6 +41,11 @@ class SheetClient:
     @property
     def worksheet(self):
         return self._ws
+    
+    def refresh_worksheet(self) -> None:
+        """Force reload worksheet to clear any caching."""
+        self._ws = self._client.open_by_key(self.cfg.sheet_id).worksheet(self.cfg.worksheet_title)
+        self._header_cache = None
 
     def get_header(self, use_cache: bool = True) -> List[str]:
         """Get header row. use_cache=True to avoid redundant API calls."""
@@ -133,7 +138,13 @@ class SheetClient:
 
         # Single batch update for all cells
         if all_cell_updates:
-            self._ws.update_cells(all_cell_updates, value_input_option="RAW")
+            try:
+                print(f"    batch_update_rows: Updating {len(all_cell_updates)} cells across {len(row_updates)} rows")
+                self._ws.update_cells(all_cell_updates, value_input_option="RAW")
+                print(f"    batch_update_rows: ✓ Update successful")
+            except Exception as e:
+                print(f"    batch_update_rows: ✗ ERROR: {type(e).__name__}: {e}")
+                raise
     
     def write_scoring_results(self, scored_jobs: List[Any]) -> int:
         """

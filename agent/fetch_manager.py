@@ -62,6 +62,8 @@ class FetchManager:
             Number of jobs attempted
         """
         start = time.time()
+        # Refresh worksheet to clear any caching after previous writes
+        self.sheet.refresh_worksheet()
         records = self.sheet.get_all_records()
         row_index = self.sheet.build_row_index(key_col="job_url")
         
@@ -75,17 +77,18 @@ class FetchManager:
             batch_updates[row_num].update(updates)
         
         # Main fetch loop (no longer needs httpx.Client context)
+        pending_count = 0
         for rec in records:
             if attempted >= self.config.max_rows_per_run:
                     break
             
-            url = (rec.get("job_url") or "").strip()
-            if not url:
+            original_url = (rec.get("job_url") or "").strip()
+            if not original_url:
                 continue
             
-            # Normalize LinkedIn URLs: strip /comm/ path to avoid anti-scraping
-            # linkedin.com/comm/jobs/view/123 -> linkedin.com/jobs/view/123
-            url = url.replace("/comm/jobs/view/", "/jobs/view/")
+            # Debug: Count how many pending jobs we see
+            if rec.get("fetch_status") in RETRYABLE_STATUSES:
+                pending_count += 1
             
             status = (rec.get("fetch_status") or "pending").strip()
             if status not in RETRYABLE_STATUSES:
@@ -105,9 +108,14 @@ class FetchManager:
             if elapsed >= self.config.total_run_budget_seconds:
                 break
             
-            row_num = row_index.get(url)
+            # Get row_num using ORIGINAL URL (before normalization)
+            row_num = row_index.get(original_url)
             if not row_num:
                 continue  # should not happen; defensive
+            
+            # Normalize LinkedIn URLs for fetching: strip /comm/ path to avoid anti-scraping
+            # linkedin.com/comm/jobs/view/123 -> linkedin.com/jobs/view/123
+            fetch_url = original_url.replace("/comm/jobs/view/", "/jobs/view/")
             
             attempted += 1
             
@@ -120,7 +128,7 @@ class FetchManager:
             })
             
             try:
-                html = self.fetch_client.fetch(url, self.config.per_url_timeout_seconds)
+                html = self.fetch_client.fetch(fetch_url, self.config.per_url_timeout_seconds)
             except httpx.TimeoutException:
                 add_update(row_num, {"fetch_status": "timeout", "fetch_error": "timeout"})
                 continue
@@ -151,7 +159,11 @@ class FetchManager:
             })
         
         # Batch write all updates at once
+        print(f"  Debug: Saw {pending_count} total pending jobs, attempted {attempted}")
         if batch_updates:
+            print(f"  Debug: Writing {len(batch_updates)} row updates to Sheet")
             self.sheet.batch_update_rows(batch_updates)
+        else:
+            print("  Debug: No batch updates to write!")
         
         return attempted
