@@ -96,6 +96,41 @@ This document captures key moments where I (Katie) actively problem-solved and c
 
 ---
 
+### 6. **Diagnosing the Row Deletion Caching Bug** (Feb 11, 2026)
+
+**Context:** After deleting rows from the Sheet, the fetch pipeline stopped working. Terminal showed "✓ Fetched 25 jobs" but Sheet remained unchanged (fetch_status = pending, fetch_attempts = 0).
+
+**My Contribution:**
+- Recognized the timing: "It was working at 10:38 AM EST, then I deleted rows, now it's broken"
+- Observed the symptom: "Data is being written willy-nilly all over the sheet" - updates going to wrong rows
+- Provided specific evidence: Showed exact row data with timestamps proving the pattern
+- Identified that the issue started after row deletion, not before
+- Asked clarifying questions to help AI understand the messy state
+
+**AI's Investigation:**
+- AI initially focused on wrong causes (authentication, rate limits, LinkedIn blocking)
+- User's timeline observation ("worked before deletion") redirected investigation
+- AI discovered gspread worksheet caching was holding stale row numbers
+- Root cause: After row deletion, row numbers shifted but cached worksheet had old positions
+
+**Solution:**
+- Added `refresh_worksheet()` method to force gspread to reload sheet data
+- Call refresh before fetching to clear any stale row number cache
+- This ensures row index is always fresh, even after sheet modifications
+
+**Impact:**
+- ✅ Fetch pipeline now resilient to sheet modifications (row deletion/insertion)
+- ✅ System can handle manual sheet cleanup without breaking
+- ✅ Starting fresh (delete all rows) now works correctly
+
+**What I learned:**
+- Timing matters: "when did it break?" is as important as "what's broken?"
+- Sometimes the solution is clearing a cache, not fixing logic
+- Communicating observed symptoms clearly helps AI debug faster
+- Manual data operations (like deleting rows) can have unexpected side effects in systems that cache state
+
+---
+
 ## Design Decisions I Made
 
 ### Hybrid Approach for Fetching
