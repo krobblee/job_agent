@@ -1,8 +1,8 @@
 # Job Agent
 
-This repository implements a job-search agent that ingests job alerts from Gmail, deduplicates and tracks job postings via a Google Sheet, fetches and parses job pages, and scores eligible roles against a candidate profile.
+A job-search agent that ingests jobs from Gmail and startup aggregators (e.g. topstartups.io), deduplicates and tracks postings via a Google Sheet, fetches and parses job pages, and scores eligible roles against a candidate profile. Supports separate pipelines for LinkedIn (Gmail) and Greenhouse (ATS) jobs.
 
-The system is designed to be resumable, inspectable, and safe to run repeatedly without silent drops or duplicate work.
+The system is resumable, inspectable, and safe to run repeatedly without silent drops or duplicate work.
 
 ---
 
@@ -10,60 +10,62 @@ The system is designed to be resumable, inspectable, and safe to run repeatedly 
 
 ### Prerequisites
 - Python 3.9+
-- Gmail API credentials (`gmail_credentials.json`)
+- Gmail API credentials (`gmail_credentials.json`) — for LinkedIn pipeline
 - Google Service Account credentials (`credentials/service_account.json`)
-- Google Sheet for job tracking
+- Google Sheet with two tabs: LinkedIn, Greenhouse
 
 ### Installation
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Set up environment variables
-cp .env.example .env  # Then edit .env with your values
 ```
 
 ### Configuration
 
-Create a `.env` file with:
+Create a `.env` file:
 ```
 OPENAI_API_KEY=your_openai_key
-GMAIL_QUERY=from:(jobalerts-noreply@linkedin.com) newer_than:3d
 SHEET_ID=your_google_sheet_id
+
+# Optional — defaults shown
+GMAIL_QUERY=from:(jobalerts-noreply@linkedin.com) newer_than:3d
+LINKEDIN_WORKSHEET=Sheet1
+GREENHOUSE_WORKSHEET=Greenhouse
 ```
+
+For Greenhouse discovery, add aggregator URLs to `data/Startup_URLs.txt` (one per line). Use job listing pages that link directly to ATS job pages — e.g. `https://topstartups.io/jobs`.
 
 ### Run
 
 ```bash
+# LinkedIn pipeline (Gmail → Sheet → Fetch → Score)
 python run_agent.py
+
+# Greenhouse pipeline (Aggregators → Sheet → Fetch → Score)
+python run_greenhouse.py
 ```
 
 ---
 
 ## System overview
 
-The job agent operates as a staged pipeline:
+Two pipelines share the same Sheet and scoring logic:
 
-1. **Discovery**
-   - Gmail is queried for job alert emails
-   - Job URLs are extracted from email HTML bodies
-   - URLs are canonicalized and deduplicated (strips `/comm/` tracking paths)
+### LinkedIn pipeline (`run_agent.py`)
+1. **Discovery** — Gmail job alerts → extract URLs, strip `/comm/` tracking
+2. **Storage** — Upsert to LinkedIn tab
+3. **Fetch** → **Score** — Same as Greenhouse
 
-2. **Storage & resume**
-   - A Google Sheet is the single source of truth
-   - Each job URL is tracked with explicit state
-   - All stages resume safely across runs
+### Greenhouse pipeline (`run_greenhouse.py`)
+1. **Discovery** — Scrape aggregator pages (e.g. topstartups.io/jobs) → extract direct Greenhouse job URLs
+2. **Delta** — Compare vs previous snapshot; only new URLs are "fresh" (posted since last run)
+3. **Storage** — Append new jobs to Greenhouse tab
+4. **Fetch** → **Score** — Same as LinkedIn
 
-3. **Fetching**
-   - Job pages are fetched with enhanced browser headers
-   - Parsing extracts structured job information (title, company, description)
-   - Failures are recorded explicitly with retry logic
-
-4. **Scoring**
-   - Only successfully fetched job pages are scored
-   - Jobs are bucketed: **True Match / Monitor / Reject**
-   - Results written back to Sheet with reasoning
+### Shared
+- **Storage & resume** — Google Sheet is the single source of truth; explicit fetch_status lifecycle
+- **Fetching** — Job pages fetched with browser headers; parsing extracts title, company, description
+- **Scoring** — Bucketed: **True Match / Monitor / Reject**; profile hard NOs include defense, crypto, government
 
 ---
 
@@ -71,26 +73,34 @@ The job agent operates as a staged pipeline:
 
 ```
 job-agent/
-├── run_agent.py              # Main orchestrator - runs full pipeline
-├── config.py                 # Settings, constants, API clients
-├── models.py                 # Data classes (Job, ScoredJob, AgentDigest)
-├── requirements.txt          # Python dependencies
-├── .env                      # Environment variables (not in git)
+├── run_agent.py              # LinkedIn pipeline (Gmail → Fetch → Score)
+├── run_greenhouse.py         # Greenhouse pipeline (Aggregators → Fetch → Score)
+├── config.py                 # Settings, PROFILE, worksheet names
+├── models.py                 # Job, ScoredJob, AgentDigest
+├── requirements.txt
+├── .env
 │
-├── agent/                    # Core modules
-│   ├── discovery.py          # GmailDiscoverySource - job discovery from Gmail
-│   ├── sheet_client.py       # SheetClient - Google Sheet read/write
-│   ├── fetch_manager.py      # FetchManager - fetch lifecycle & retry logic
-│   ├── fetch_client.py       # HttpFetcher - URL fetching with headers
-│   ├── page_parser.py        # HTML parsing functions
-│   └── scorer.py             # Job scoring and bucketing
+├── agent/
+│   ├── discovery.py          # Gmail job discovery
+│   ├── greenhouse_discovery.py  # Scrape aggregators for Greenhouse job URLs
+│   ├── sheet_client.py
+│   ├── fetch_manager.py
+│   ├── fetch_client.py
+│   ├── page_parser.py
+│   └── scorer.py
 │
-├── scripts/                  # Utility scripts
-│   ├── normalize_comm_urls.py  # Clean up /comm/ tracking URLs
-│   ├── run_fetch_once.py       # Run fetch step only
-│   └── upsert_pending.py       # Manual URL insertion
+├── data/
+│   ├── Startup_URLs.txt      # Aggregator URLs for Greenhouse discovery
+│   └── snapshots/            # Greenhouse delta snapshots (by run)
 │
-└── credentials/              # API credentials (not in git)
+├── scripts/
+│   ├── greenhouse_upsert.py
+│   ├── greenhouse_snapshot.py
+│   ├── normalize_comm_urls.py
+│   ├── run_fetch_once.py
+│   └── upsert_pending.py
+│
+└── credentials/
     └── service_account.json
 ```
 
@@ -150,6 +160,7 @@ Jobs are categorized into three buckets (NO numeric scoring):
   - Infrastructure/platform/architecture heavy
   - Professional services/implementation
   - Compliance/regulatory/GRC domains
+  - Defense/military, crypto/blockchain/Web3, government sector
 
 **Scoring invariant:**
 
@@ -163,7 +174,7 @@ Email-derived context must not be scored once job-page fetching is implemented.
 
 The Google Sheet is the system’s persistent data model and source of truth.
 
-Each row represents a unique job URL and includes:
+The Sheet has two tabs: **LinkedIn** (Gmail) and **Greenhouse** (aggregators). Each row = one job URL. Greenhouse uses `first_seen` and `company` (board slug); LinkedIn uses `date_received`, `last_seen_at`.
 
 **Discovery & Tracking:**
 - `job_url` - Canonicalized job URL (tracking params stripped)
@@ -193,26 +204,22 @@ Each row represents a unique job URL and includes:
 
 ## How It Works
 
-When you run `python run_agent.py`, the agent executes this pipeline:
+**LinkedIn** (`run_agent.py`): Gmail → discover URLs → upsert to Sheet → fetch → score
 
-1. **Connect to Google Sheet** - Establishes connection to your tracking sheet
-2. **Discover jobs from Gmail** - Queries Gmail for job alert emails, extracts URLs
-3. **Write to Sheet** - Upserts new URLs as "pending", updates last_seen_at for existing
-4. **Fetch job pages** - Fetches up to 25 pending jobs per run with retry logic
-5. **Score jobs** - Buckets fetched jobs into true_match/monitor/reject with reasoning
-6. **Update Sheet** - Writes buckets and reasoning back to Sheet
+**Greenhouse** (`run_greenhouse.py`): Scrape aggregators → delta vs previous snapshot → append new jobs → fetch → score. Run every 48h to capture fresh postings.
 
-The system is **resumable** - you can run it multiple times and it will pick up where it left off.
+Both pipelines share fetch and score logic. The system is **resumable** — safe to run repeatedly.
 
 ---
 
 ## Key Features
 
-- **URL Normalization** - Strips tracking parameters and `/comm/` paths from LinkedIn URLs
-- **Batch Updates** - Writes to Sheet in batches to avoid API rate limits
-- **Retry Logic** - Up to 3 fetch attempts per URL with exponential backoff
-- **Explicit State** - Every job has clear status (pending/fetched/failed/timeout)
-- **Clean Separation** - Modular design with clear responsibilities
+- **Dual pipelines** — LinkedIn (Gmail) and Greenhouse (aggregator scraping); separate tabs, shared fetch/score
+- **Greenhouse freshness** — Delta-based discovery (run every 48h; new URLs = fresh jobs)
+- **Profile hard NOs** — Defense, crypto, government excluded from true_match
+- **URL Normalization** — Strips `/comm/` from LinkedIn URLs
+- **Batch Updates** — Avoids Sheets API rate limits
+- **Explicit State** — pending/fetched/failed/timeout lifecycle
 
 ---
 
