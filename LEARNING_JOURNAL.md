@@ -131,6 +131,66 @@ This document captures key moments where I (Katie) actively problem-solved and c
 
 ---
 
+### 7. **Profile Hard NOs — Catching a Scoring Gap** (Feb 18, 2026)
+
+**Context:** A job marked as true_match was in the defense industry — a hard NO for Katie.
+
+**My Contribution:**
+- Noticed the mismatch: "one of the jobs accepted as a true_match is in the defense industry"
+- Requested prompt update to exclude defense, crypto, and government sectors
+- Ensured both config PROFILE and scorer REJECT rule reflected these exclusions
+
+**What I learned:**
+- Spot-check LLM output against real results — the profile is only as good as what's enforced
+- Catching edge cases early prevents bad recommendations
+
+---
+
+### 8. **Discovery Chain Insight** (Feb 13–14, 2026)
+
+**Context:** Plan was to scrape aggregators and extract Greenhouse links.
+
+**My Contribution:**
+- Pushed back: "We don't know they're necessarily on Greenhouse"
+- Clarified the flow: aggregator → company profile → careers page → check if Greenhouse
+- This led to verifying topstartups.io/jobs — which *does* have direct Greenhouse links, simplifying the design
+
+**What I learned:**
+- Question whether data exists where the plan assumes — verify before building
+- Asking "how does this actually work?" surfaces simpler or different approaches
+
+---
+
+### 9. **Publishing Boundaries and Security Ownership** (Feb 18, 2026)
+
+**Context:** Preparing the repo for portfolio; AI had committed without explicit permission.
+
+**My Contribution:**
+- Drove the pre-publish security checklist: rotate keys, .env.example, stop tracking credentials
+- Set the rule: "Never commit unless I explicitly say so" (documented in CONTINUATION_PROMPT_V3)
+- Owned the publish process — didn't defer; ran through the checklist and made decisions
+
+**What I learned:**
+- Boundary-setting extends beyond architecture — workflows (who commits, when) matter too
+- Taking ownership of security steps prevents shortcuts and oversights
+
+---
+
+### 10. **Greenhouse Tab Separation** (Feb 13, 2026)
+
+**Context:** Adding Greenhouse pipeline; AI initially assumed jobs could live in the same sheet as LinkedIn.
+
+**My Contribution:**
+- Said: "I don't want to pollute the current Google Sheet I have for LinkedIn jobs"
+- Asked for a separate tab and a user-friendly structure for the front end (Sheet is her only UI)
+- Kept pipelines logically separate while sharing fetch/scoring logic
+
+**What I learned:**
+- Data organization reflects how you work — separate concerns when they serve different workflows
+- "User-friendly" means designing for how the data will actually be used
+
+---
+
 ## Design Decisions I Made
 
 ### Hybrid Approach for Fetching
@@ -152,6 +212,8 @@ This document captures key moments where I (Katie) actively problem-solved and c
 1. "Why would you rename it?" → Forced clarification of architectural intent
 2. "Why did it work before without changing headers?" → Uncovered the real problem
 3. "Can we try stripping out 'comm' from a url?" → Simple solution instead of complex one
+4. "We don't know they're necessarily on Greenhouse" → Led to verifying aggregator structure
+5. "That's a NO GO for me" (re: defense) → Caught profile gap, added hard NOs
 
 ---
 
@@ -162,6 +224,8 @@ This document captures key moments where I (Katie) actively problem-solved and c
 - **Own the decisions:** AI executes, but you decide strategy
 - **Historical context matters:** What changed between working and not working?
 - **User experience trumps technical purity:** Readable timestamps > technically correct UTC
+- **Spot-check LLM output:** Profile gaps show up in real results — verify
+- **Boundaries extend to workflows:** Who commits, when, and how — document and enforce
 
 ---
 
