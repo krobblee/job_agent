@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import Dict, List
 
 from agent.sheet_client import SheetConfig, SheetClient, utc_now_iso
+from config import LINKEDIN_WORKSHEET, SHEET_ID
 
 # v1 contract constants
 MAX_FETCH_ATTEMPTS = 3
-
-SHEET_ID = "1mGVfJZuQzfIEtIbqnpxyh9UajHZ8b9JA77lXpR2hOgo"
 
 
 def upsert_pending(sheet: SheetClient, job_urls: List[str], source: str = "linkedin") -> None:
@@ -55,7 +54,7 @@ def upsert_pending(sheet: SheetClient, job_urls: List[str], source: str = "linke
 
 
 def main():
-    cfg = SheetConfig(sheet_id=SHEET_ID, worksheet_title="Sheet1")
+    cfg = SheetConfig(sheet_id=SHEET_ID, worksheet_title=LINKEDIN_WORKSHEET)
     sheet = SheetClient(cfg)
 
     # TODO: replace this with real URLs from your Gmail extractor once wired

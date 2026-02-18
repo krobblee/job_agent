@@ -8,11 +8,13 @@ __pycache__/
 
 # Secrets / local config
 .env
+credentials/
 gmail_credentials.json
 gmail_token.json
 
 # Local data
 jobs.db
+data/snapshots/*.json
 
 # Optional: logs
 *.log
