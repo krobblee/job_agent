@@ -9,7 +9,7 @@ from agent.fetch_client import HttpFetcher
 from agent.fetch_manager import FetchConfig, FetchManager
 from agent.scorer import rank_jobs
 from agent.sheet_client import SheetClient, SheetConfig
-from config import SHEET_ID
+from config import LINKEDIN_WORKSHEET, SHEET_ID
 from models import Job
 
 # Import upsert_pending logic
@@ -47,7 +47,7 @@ def main() -> None:
     """
     # 1. Initialize Sheet (source of truth)
     print("=== Initializing Sheet ===")
-    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID))
+    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=LINKEDIN_WORKSHEET))
     print("✓ Connected\n")
 
     # 2. Discover jobs from Gmail

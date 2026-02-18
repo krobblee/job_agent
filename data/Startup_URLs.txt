@@ -1,0 +1,13 @@
+# Aggregator URLs for Greenhouse discovery (one URL per line)
+# We extract links to boards.greenhouse.io from these pages.
+# Add job listing pages from Y Combinator, Wellfound, etc.
+# Use job listing pages (they have direct Apply links).
+#
+https://topstartups.io/jobs
+https://www.workatastartup.com/jobs
+https://wellfound.com/jobs
+https://topstartups.io/?industries=Artificial+Intelligence&industries=Analytics&industries=Collaboration&industries=Consumer&industries=Data+Science&industries=E-Commerce&industries=EdTech&industries=Enterprise+Software&industries=Gaming&industries=Marketplace&industries=Media&industries=Retail&industries=SaaS&industries=Sales&company_size=51-100+employees&company_size=101-200+employees&company_size=201-500+employees&company_size=501-1000+employees&funding_round=Series+B&funding_round=Series+C&funding_round=Series+D&funding_round=Series+E&funding_round=Series+F&funding_round=Series+G&funding_round=Series+H&funding_round=Series+I&funding_round=Post-IPO&funding_round=Unknown
+
+https://jobs.a16z.com/jobs?locations=United+States&remoteOnly=true&postedSince=P7D
+
+https://www.ycombinator.com/companies?isHiring=true&regions=Fully%20Remote

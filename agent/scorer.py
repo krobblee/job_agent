@@ -14,7 +14,7 @@ Profile:
 Decision rules:
 - TRUE MATCH: Strong fit for 0-1/greenfield, founding TPM/Product Ops, operating model transformation, SDLC/PDLC improvement, AI adoption/enablement
 - MONITOR: Partial fit, some good signals but missing key elements
-- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC
+- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector
 
 Jobs to analyze:
 {jobs}
