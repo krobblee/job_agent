@@ -141,6 +141,7 @@ This handoff assumes a highly structured, incremental working style.
 
 The implementation chat must follow these rules:
 
+- **Never commit to git unless the user explicitly says so.**
 - Proceed **one step at a time**
 - Do not batch multiple implementation steps into a single response
 - Explicitly stop and wait for confirmation before moving to the next step
