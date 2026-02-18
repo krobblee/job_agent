@@ -1,0 +1,123 @@
+"""
+Greenhouse job discovery pipeline.
+
+Runs every 48h. Discovers Greenhouse boards from startup aggregators (Startup_URLs.txt),
+scrapes jobs, diffs against previous snapshot for freshness, and appends new jobs
+to the Greenhouse tab. Then fetches job pages and scores them.
+
+Pipeline: Discovery → (optional) Upsert new → Save snapshot → Fetch → Score
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import List
+from zoneinfo import ZoneInfo
+
+from agent.fetch_client import HttpFetcher
+from agent.fetch_manager import FetchConfig, FetchManager
+from agent.greenhouse_discovery import discover_greenhouse_jobs
+from agent.scorer import rank_jobs
+from agent.sheet_client import SheetClient, SheetConfig
+from config import (
+    GREENHOUSE_SNAPSHOT_DIR,
+    GREENHOUSE_WORKSHEET,
+    SHEET_ID,
+    STARTUP_URLS_PATH,
+)
+from models import Job
+from scripts.greenhouse_snapshot import load_previous_snapshot, save_snapshot
+from scripts.greenhouse_upsert import upsert_greenhouse_jobs
+
+
+def _build_jobs_from_records(records: List[dict]) -> List[Job]:
+    """Build Job objects from Sheet records (fetch_status='fetched')."""
+    jobs = []
+    for rec in records:
+        if rec.get("fetch_status") == "fetched":
+            job = Job(
+                source="greenhouse",
+                url=rec.get("job_url", ""),
+                title=rec.get("role_title"),
+                company=rec.get("company"),
+                location_text=rec.get("location"),
+                job_description=rec.get("job_description"),
+            )
+            job.metadata["fetch_status"] = "fetched"
+            jobs.append(job)
+    return jobs
+
+
+def main() -> None:
+    print("=== Greenhouse Pipeline ===\n")
+
+    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=GREENHOUSE_WORKSHEET))
+
+    # 1. Discover all Greenhouse jobs
+    print("=== Discovery ===")
+    jobs = discover_greenhouse_jobs(
+        seed_urls_path=STARTUP_URLS_PATH,
+        timeout=15,
+        delay_between_requests=2.0,
+    )
+    if not jobs:
+        print("No jobs discovered. Add aggregator URLs to data/Startup_URLs.txt (one per line)")
+        return
+
+    current_urls = {j.url for j in jobs}
+    print(f"\nTotal jobs this run: {len(jobs)}\n")
+
+    # 2. Delta and upsert new jobs
+    previous_urls = load_previous_snapshot(GREENHOUSE_SNAPSHOT_DIR)
+    new_jobs = [j for j in jobs if j.url not in previous_urls]
+    print(f"Previous snapshot: {len(previous_urls)} URLs")
+    print(f"New (fresh) jobs: {len(new_jobs)}\n")
+
+    if new_jobs:
+        print("=== Sheet Write ===")
+        appended = upsert_greenhouse_jobs(sheet, new_jobs)
+        print(f"✓ Appended {appended} new jobs to Greenhouse tab\n")
+
+    # 3. Save snapshot
+    eastern = ZoneInfo("America/New_York")
+    save_snapshot(
+        GREENHOUSE_SNAPSHOT_DIR,
+        datetime.now(eastern).strftime("%Y-%m-%d"),
+        list(current_urls),
+    )
+    print(f"✓ Snapshot saved ({len(current_urls)} URLs)\n")
+
+    # 4. Fetch pending job pages
+    print("=== Fetching ===")
+    http_fetcher = HttpFetcher(delay_between_requests=1.5)
+    fetch_manager = FetchManager(sheet, FetchConfig(max_rows_per_run=25), fetch_client=http_fetcher)
+    attempted = fetch_manager.fetch_pending_jobs()
+    print(f"✓ Fetched {attempted} jobs\n")
+
+    # 5. Score fetched jobs
+    print("=== Scoring ===")
+    records = sheet.get_all_records()
+    fetched_jobs = _build_jobs_from_records(records)
+    print(f"Found {len(fetched_jobs)} jobs ready to score")
+
+    if fetched_jobs:
+        digest, _ = rank_jobs(fetched_jobs)
+        print(f"\n=== TRUE MATCHES ({len(digest.true_matches)}) ===")
+        for job in digest.true_matches:
+            print(f"  ✓ {job.url}")
+        print(f"\n=== MONITOR ({len(digest.monitor)}) ===")
+        for job in digest.monitor:
+            print(f"  ⚠ {job.url}")
+        print(f"\n=== REJECTS ({len(digest.rejects)}) ===")
+        for job in digest.rejects:
+            print(f"  ✗ {job.url}")
+
+        all_scored = digest.true_matches + digest.monitor + digest.rejects
+        updated = sheet.write_scoring_results(all_scored)
+        print(f"\n✓ Updated {updated} jobs with scores\n")
+    else:
+        print("No jobs ready to score yet\n")
+
+
+if __name__ == "__main__":
+    main()

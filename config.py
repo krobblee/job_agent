@@ -19,6 +19,14 @@ SHEET_ID = os.getenv("SHEET_ID")
 if not SHEET_ID:
     raise ValueError("SHEET_ID must be set in .env file")
 
+# Worksheet (tab) names
+LINKEDIN_WORKSHEET = os.getenv("LINKEDIN_WORKSHEET", "Sheet1")
+GREENHOUSE_WORKSHEET = os.getenv("GREENHOUSE_WORKSHEET", "Greenhouse")
+
+# Greenhouse discovery: aggregator URLs (one per line)
+STARTUP_URLS_PATH = os.getenv("STARTUP_URLS_PATH", "data/Startup_URLs.txt")
+GREENHOUSE_SNAPSHOT_DIR = os.getenv("GREENHOUSE_SNAPSHOT_DIR", "data/snapshots")
+
 PROFILE = """
 Candidate profile (high level):
 - 15 years TPM / Product Ops experience
@@ -32,4 +40,7 @@ Hard NOs:
 - Compliance-heavy/regulatory/legal/GRC domains
 - Implementation / onboarding / professional services / customer delivery roles
 - Infrastructure, migrations, architecture, platform-heavy work
+- Defense / defense contractors / military
+- Crypto / blockchain / Web3
+- Government sector / government contracting
 """
