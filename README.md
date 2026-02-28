@@ -43,6 +43,15 @@ python run_agent.py
 
 # Greenhouse pipeline (Aggregators → Sheet → Fetch → Score)
 python run_greenhouse.py
+
+# Rescore only (no discovery/fetch) — use when profile/config changed
+python scripts/rescore.py
+
+# Re-fetch all (reset fetched → pending, then fetch) — use after parser changes
+python scripts/rerun_fetch.py
+
+# Add feedback for the agent to learn (in Cursor: "add to feedback: I rejected Microsoft")
+python scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
 ```
 
 ---
@@ -64,8 +73,8 @@ Two pipelines share the same Sheet and scoring logic:
 
 ### Shared
 - **Storage & resume** — Google Sheet is the single source of truth; explicit fetch_status lifecycle
-- **Fetching** — Job pages fetched with browser headers; parsing extracts title, company, description
-- **Scoring** — Bucketed: **True Match / Monitor / Reject**; profile hard NOs include defense, crypto, government
+- **Fetching** — Job pages fetched with browser headers; parsing extracts title, company, location from LinkedIn title format ("Company hiring Role in Location | LinkedIn")
+- **Scoring** — Bucketed: **True Match / Monitor / Reject**; profile hard NOs include defense, crypto, government, salary below $180k base
 
 ---
 
@@ -82,6 +91,8 @@ job-agent/
 │
 ├── agent/
 │   ├── discovery.py          # Gmail job discovery
+│   ├── feedback_parser.py    # Parse free-form feedback into FeedbackPreference
+│   ├── feedback_store.py     # Load/save learned_preferences.json
 │   ├── greenhouse_discovery.py  # Scrape aggregators for Greenhouse job URLs
 │   ├── sheet_client.py
 │   ├── fetch_manager.py
@@ -90,13 +101,18 @@ job-agent/
 │   └── scorer.py
 │
 ├── data/
-│   ├── Startup_URLs.txt      # Aggregator URLs for Greenhouse discovery
+│   ├── Startup_URLs.txt        # Aggregator URLs for Greenhouse discovery
+│   ├── feedback_raw.txt         # Raw feedback (stored first, never lost)
+│   ├── learned_preferences.json  # Structured preferences (reject/exception lists, notes)
 │   └── snapshots/            # Greenhouse delta snapshots (by run)
 │
 ├── scripts/
+│   ├── add_feedback.py    # Add feedback: parse → dedupe → store
 │   ├── greenhouse_upsert.py
 │   ├── greenhouse_snapshot.py
 │   ├── normalize_comm_urls.py
+│   ├── rerun_fetch.py     # Reset fetched rows and re-fetch (e.g. after parser changes)
+│   ├── rescore.py         # Rescore all fetched jobs without discovery/fetch
 │   ├── run_fetch_once.py
 │   └── upsert_pending.py
 │
@@ -161,6 +177,12 @@ Jobs are categorized into three buckets (NO numeric scoring):
   - Professional services/implementation
   - Compliance/regulatory/GRC domains
   - Defense/military, crypto/blockchain/Web3, government sector
+  - Posted salary below $180k base (see config PROFILE)
+  - Large enterprise/big tech (Microsoft, Google, Amazon, etc.) — except Netflix, Zillow
+  - Reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply)
+  - Job description includes "No longer accepting applications" (role is closed)
+
+**Rule precedence:** Entity-level preferences override category rules (e.g. "Netflix is exception" overrides "reject large enterprises" for Netflix).
 
 **Scoring invariant:**
 
@@ -189,9 +211,9 @@ The Sheet has two tabs: **LinkedIn** (Gmail) and **Greenhouse** (aggregators). E
 - `fetch_error` - Error message if fetch failed
 
 **Job Content:**
-- `company` - Company name
-- `role_title` - Job title
-- `location` - Job location
+- `company` - Company name (parsed from LinkedIn title)
+- `role_title` - Job title (parsed from LinkedIn title)
+- `location` - Job location (parsed from LinkedIn title)
 - `apply_url` - Application URL (if different from job_url)
 - `job_description` - Full job description text
 - `job_summary` - Brief summary (if provided)
@@ -220,6 +242,19 @@ Both pipelines share fetch and score logic. The system is **resumable** — safe
 - **URL Normalization** — Strips `/comm/` from LinkedIn URLs
 - **Batch Updates** — Avoids Sheets API rate limits
 - **Explicit State** — pending/fetched/failed/timeout lifecycle
+- **Column-order flexible** — Sheet writes use header names (A1 notation); you can reorder columns and writes still target the correct cells
+- **Human-in-the-loop feedback** — Add preferences via `add_feedback.py` or in Cursor; learned preferences (reject/exception lists, role-level notes) are included in scoring
+
+---
+
+## Learned preferences (feedback)
+
+The agent learns from your feedback. Add company-level or role-level preferences:
+
+- **Company reject/exception:** `python scripts/add_feedback.py "I won't work at Microsoft"` or `"Netflix is an exception"`
+- **Role-level notes:** Tell Cursor "add to feedback: [your note]" — omit company name when the rejection is about the role type (e.g. project-level not program-level, hands-on data flows) so the pattern applies broadly
+
+Feedback is stored in `data/learned_preferences.json` (reject list, exception list, notes). Raw feedback is always stored first in `data/feedback_raw.txt`. Entity rules override category rules (e.g. Netflix overrides "reject large enterprises").
 
 ---
 
