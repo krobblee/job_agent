@@ -191,6 +191,69 @@ This document captures key moments where I (Katie) actively problem-solved and c
 
 ---
 
+### 11. **Owning the Root Cause — Column Reordering** (Feb 28, 2026)
+
+**Context:** After moving columns in the Google Sheet, the pipeline reported jobs were fetched and scored but nothing appeared in the Sheet. AI went down a different path — URL matching, trailing slash normalization, debug scripts — instead of addressing what I said.
+
+**My Contribution:**
+- Identified the cause: "i moved the columns to different locations and then the system stopped writing to the sheet the next time i ran it"
+- Had to redirect: "i disagree that's the root cause... look at that for the cause instead"
+- Restored an earlier version of the Sheet (before the column move) and confirmed it worked — validating my diagnosis
+- Created a Cursor rule (trust-user-root-cause) so AI treats my root cause diagnosis as primary and doesn't act on other theories until we discuss
+
+**Solution:**
+- Switched from gspread's `update_cells()` (Cell objects with numeric coordinates) to `batch_update()` with A1 notation
+- Writes now target cells by header name; column order no longer matters
+
+**What I learned:**
+- When I know the cause, I need to assert it clearly — AI can go down wrong paths
+- Codifying "trust my diagnosis" in rules prevents recurrence
+- Restoring to a known-good state is a valid way to validate a hypothesis
+
+---
+
+### 12. **"Don't Do Anything Until X" — Enforcing Boundaries** (Feb 28, 2026)
+
+**Context:** I said "don't change anything quite yet just answer that question first." AI made edits anyway (removed the debug code, then reverted it). I had to correct: "I literally said don't do anything and then you went and did something."
+
+**My Contribution:**
+- Asked how to prevent this: "How can we ensure that better?"
+- Created Cursor rules instead of just complaining:
+  - `dont-do-until`: When I say "don't do anything until X," only respond in text; no edits or commands until I give the go-ahead
+  - `trust-user-root-cause`: When I state the root cause, address that first; don't act on other theories until we discuss
+- Asked for explanation before approving: "I want to understand what it is you're doing before i allow anything" — ensured I understood the A1 notation fix before saying ok
+
+**What I learned:**
+- "Don't do anything" needs to be explicit and enforceable — rules make it stick
+- Turning frustration into process (Cursor rules) prevents the same mistake from recurring
+- Asking for explanation before approving changes keeps me in control
+
+---
+
+### 13. **Human-in-the-Loop Feedback System** (Feb 2, 2026)
+
+**Context:** Wanted to teach the agent from my feedback without editing config or prompts every time. Needed company-level (reject/exception) and role-level (notes) preferences.
+
+**My Contribution:**
+- Asked for a feedback system that stores raw feedback first, then parses into structured preferences
+- Used role-level notes for patterns that apply broadly (e.g. "project-level not program-level," "hands-on data flows") — omit company name so the pattern applies across roles
+- Clarified that entity rules should override category rules (e.g. Netflix overrides "reject large enterprises")
+- Added Cursor rule so AI runs `add_feedback` when I add feedback in chat
+
+**Solution:**
+- `data/feedback_raw.txt` — raw feedback stored first, never lost
+- `data/learned_preferences.json` — structured reject list, exception list, notes
+- `scripts/add_feedback.py` — parse via LLM, retry once, ask for clarification if parse fails
+- Scorer loads learned prefs and includes them in the prompt; learned patterns override positive signals
+- Reject rules: large enterprises (Microsoft, Google, Amazon) except Netflix/Zillow; reposted jobs; "No longer accepting applications"
+
+**What I learned:**
+- Role-level feedback is often more reusable than company-specific — design for both
+- Raw-first storage prevents losing intent when parsing fails
+- Codifying "run add_feedback when I add feedback" in a rule keeps the workflow consistent
+
+---
+
 ## Design Decisions I Made
 
 ### Hybrid Approach for Fetching
@@ -214,6 +277,8 @@ This document captures key moments where I (Katie) actively problem-solved and c
 3. "Can we try stripping out 'comm' from a url?" → Simple solution instead of complex one
 4. "We don't know they're necessarily on Greenhouse" → Led to verifying aggregator structure
 5. "That's a NO GO for me" (re: defense) → Caught profile gap, added hard NOs
+6. "I want to understand what it is you're doing before i allow anything" → Ensured explanation before approving changes
+7. "How can we ensure that better?" → Led to creating Cursor rules instead of one-off corrections
 
 ---
 
@@ -226,6 +291,10 @@ This document captures key moments where I (Katie) actively problem-solved and c
 - **User experience trumps technical purity:** Readable timestamps > technically correct UTC
 - **Spot-check LLM output:** Profile gaps show up in real results — verify
 - **Boundaries extend to workflows:** Who commits, when, and how — document and enforce
+- **Trust my diagnosis:** When I state the root cause, that's the primary cause — don't explore alternatives until we discuss
+- **"Don't do anything until X" means no edits:** Codify in rules so it's enforceable
+- **Role-level feedback applies broadly:** Omit company name when the pattern is about the role type
+- **Run add_feedback when I add feedback:** Codify in rules so the workflow is consistent
 
 ---
 
