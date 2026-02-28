@@ -1,0 +1,12 @@
+---
+description: When user says don't do anything until X, wait for that condition before acting
+alwaysApply: true
+---
+
+# Don't Do Anything Until
+
+When the user says "don't do anything until X," "don't change anything until X," "don't do anything quite yet," or similar phrasing, **do not make any edits, run any commands, or take any actions** until the condition they specify is met.
+
+- Only respond in text. Answer questions, explain, or acknowledge.
+- Do not use tools that modify files, run commands, or change state.
+- Wait for the user to explicitly give the go-ahead (e.g., "ok," "go ahead," "you can do it now") before taking action.
