@@ -1,20 +1,43 @@
 from __future__ import annotations
 
-from config import PROFILE, client
+from pathlib import Path
+
+from config import LEARNED_PREFERENCES_PATH, PROFILE, client
+from agent.feedback_store import load_preferences
 from models import AgentDigest, ScoredJob, Job
 
 
+def _format_learned_preferences() -> str:
+    """Load learned preferences and format for prompt. Cap at 30 entries to avoid bloat."""
+    prefs = load_preferences(Path(LEARNED_PREFERENCES_PATH))
+    reject = prefs.get("reject", [])[:15]
+    exception = prefs.get("exception", [])[:15]
+    notes = prefs.get("notes", [])[:10]
+    if not reject and not exception and not notes:
+        return ""
+    lines = []
+    if reject:
+        lines.append(f"Reject these companies: {', '.join(reject)}")
+    if exception:
+        lines.append(f"Exceptions (override category rules): {', '.join(exception)}")
+    if notes:
+        for n in notes:
+            lines.append(f"- {n}")
+    return "Learned from your feedback:\n" + "\n".join(lines) + "\n\n"
+
+
 def build_prompt(jobs: list[Job]) -> str:
+    learned = _format_learned_preferences()
     return f"""
 You are a job-search agent analyzing job postings for a candidate.
 
 Profile:
 {PROFILE}
-
+{learned}
 Decision rules:
 - TRUE MATCH: Strong fit for 0-1/greenfield, founding TPM/Product Ops, operating model transformation, SDLC/PDLC improvement, AI adoption/enablement
 - MONITOR: Partial fit, some good signals but missing key elements
-- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector
+- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector, employer Remote Hunter, posted salary significantly below candidate minimum (see profile), large enterprise/big tech (Microsoft, Google, Amazon, etc.) — EXCEPT Netflix, Zillow (see profile), reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply), job description includes "No longer accepting applications" (role is closed). ALSO REJECT any role that matches the patterns in "Learned from your feedback" above — apply those patterns even when the job has other positive signals.
 
 Jobs to analyze:
 {jobs}
@@ -53,6 +76,8 @@ IMPORTANT:
 - why: array of 2-4 strings explaining the decision
 - what_to_do_next: short action recommendation
 - Put ALL jobs into one of the three buckets (no numeric scoring)
+- Entity rules override category rules: e.g. "reject large enterprises" (category) vs "Netflix is exception" (entity) — for Netflix, the entity exception wins
+- If a job matches a rejection pattern in "Learned from your feedback" (e.g. project-level not program-level, hands-on data flows/SQL/JSON), REJECT it — do not override with positive signals like salary or AI focus
 """
 
 

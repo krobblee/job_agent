@@ -1,0 +1,13 @@
+---
+description: When user adds feedback for the job agent, run add_feedback script
+alwaysApply: true
+---
+
+# Feedback for Job Agent
+
+When the user says "add to feedback", "add this to feedback", "record this for the agent", or similar:
+
+1. Run: `python scripts/add_feedback.py "<their feedback text>"`
+2. If the script returns PARSE_FAILED (exit code 2), ask the user for clarification using the suggested questions
+3. If the user clarifies (e.g. "a, it was Microsoft"), run the script again with the clarified input
+4. Do not add feedback to config.py or other files — use the add_feedback script
