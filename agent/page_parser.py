@@ -1,8 +1,40 @@
 from __future__ import annotations
 
+import re
 from typing import Tuple
 
 from bs4 import BeautifulSoup
+
+
+def _parse_linkedin_title(title: str) -> Tuple[str, str, str]:
+    """
+    Parse LinkedIn <title> format: "Company hiring Role in Location | LinkedIn"
+    
+    Returns:
+        Tuple of (company, role_title, location)
+    """
+    company = ""
+    role_title = title
+    location = ""
+    
+    # Strip LinkedIn suffix
+    clean = re.sub(r"\s*\|\s*LinkedIn\s*$", "", title, flags=re.IGNORECASE).strip()
+    
+    # Match "Company hiring Role in Location"
+    if " hiring " in clean:
+        before, after = clean.split(" hiring ", 1)
+        company = before.strip()
+        role_part = after
+        
+        if " in " in role_part:
+            # Use last " in " so roles like "PM in Product" don't break location
+            role_title, location = role_part.rsplit(" in ", 1)
+            role_title = role_title.strip()
+            location = location.strip()
+        else:
+            role_title = role_part.strip()
+    
+    return company, role_title, location
 
 
 def extract_job_info(html: str) -> Tuple[str, str, str, str]:
@@ -17,9 +49,9 @@ def extract_job_info(html: str) -> Tuple[str, str, str, str]:
     
     Returns:
         Tuple of (role_title, company, location, job_description)
-        - role_title: Extracted from <title> tag
-        - company: Empty string (best-effort extraction not implemented in v1)
-        - location: Empty string (best-effort extraction not implemented in v1)
+        - role_title: Job title (parsed from <title>; "Company hiring Role in Location" → "Role")
+        - company: Company name (parsed from <title> when format is "Company hiring ...")
+        - location: Location (parsed from <title> when format includes " in Location")
         - job_description: Concatenated visible text from main/article/body, bounded to 6000 chars
     
     Note:
@@ -31,6 +63,8 @@ def extract_job_info(html: str) -> Tuple[str, str, str, str]:
     # Extract title from <title> tag
     title = (soup.title.get_text(strip=True) if soup.title else "").strip()
     
+    company, role_title, location = _parse_linkedin_title(title)
+    
     # Extract description: concatenate visible text from main/article/body
     main = soup.find("main") or soup.find("article") or soup.body
     desc = ""
@@ -39,9 +73,4 @@ def extract_job_info(html: str) -> Tuple[str, str, str, str]:
         # Bound to 6000 chars for sheet compatibility and reasonable summary size
         desc = desc[:6000]
     
-    # Company and location extraction are best-effort for v1
-    # More sophisticated extraction can be added in future versions
-    company = ""
-    location = ""
-    
-    return title, company, location, desc
+    return role_title, company, location, desc

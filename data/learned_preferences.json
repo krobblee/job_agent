@@ -1,0 +1,10 @@
+{
+  "reject": [
+    "Klaviyo",
+    "Microsoft"
+  ],
+  "exception": [],
+  "notes": [
+    "Roles that are project-level instead of program-level, or that focus on hands-on data flows/SQL/JSON, should be rejected \u2014 I want to facilitate and orchestrate at org level."
+  ]
+}

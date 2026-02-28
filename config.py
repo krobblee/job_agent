@@ -27,9 +27,17 @@ GREENHOUSE_WORKSHEET = os.getenv("GREENHOUSE_WORKSHEET", "Greenhouse")
 STARTUP_URLS_PATH = os.getenv("STARTUP_URLS_PATH", "data/Startup_URLs.txt")
 GREENHOUSE_SNAPSHOT_DIR = os.getenv("GREENHOUSE_SNAPSHOT_DIR", "data/snapshots")
 
+# Feedback / learned preferences
+FEEDBACK_RAW_PATH = os.getenv("FEEDBACK_RAW_PATH", "data/feedback_raw.txt")
+LEARNED_PREFERENCES_PATH = os.getenv("LEARNED_PREFERENCES_PATH", "data/learned_preferences.json")
+
 PROFILE = """
 Candidate profile (high level):
 - 15 years TPM / Product Ops experience
+
+Salary requirements:
+- Reject if posted salary/compensation is stated and below $180k base (minimum; higher for leadership)
+- If salary is not posted, do not reject solely on that basis (can apply and negotiate)
 - Wants to lead digital transformation: improve PDLC/SDLC, workflows, operating model, and execution predictability
 - Strong interest in AI-enabled transformation: adopting AI tools/agents, redefining roles & responsibilities for engineers and PMs, helping teams manage agents and work more strategically
 - Strong preference for 0-1 / greenfield / building new software and new capabilities
@@ -43,4 +51,10 @@ Hard NOs:
 - Defense / defense contractors / military
 - Crypto / blockchain / Web3
 - Government sector / government contracting
+- Employer: Remote Hunter
+- Large enterprise / big tech companies (e.g. Microsoft, Google, Amazon) — EXCEPT: Netflix, Zillow (add others to this exceptions list as needed)
+- Reposted jobs (e.g. "United States · Reposted 3 days ago") — too late to apply, too many applications
+- Job description includes "No longer accepting applications" — role is closed
+
+Rule precedence: Entity-level preferences override category rules. E.g. "reject large enterprises" is a category rule; "Netflix is exception" is an entity rule — for Netflix, the entity rule wins.
 """

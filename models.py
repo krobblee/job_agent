@@ -32,6 +32,12 @@ class ScoredJob(BaseModel):
     what_to_do_next: str  # Action recommendation
 
 
+class FeedbackPreference(BaseModel):
+    """Parsed feedback: entity-level preference (reject or exception)."""
+    entity: str  # Company name, normalized
+    action: str  # "reject" or "exception"
+
+
 class AgentDigest(BaseModel):
     """
     Complete scoring digest from agent.
