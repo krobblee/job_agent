@@ -1,0 +1,12 @@
+---
+description: Trust user's root cause diagnosis; discuss before acting on other theories
+alwaysApply: true
+---
+
+# Trust User Root Cause
+
+When the user tells you the root cause of a bug, treat that as the primary cause. Do not go off and implement fixes for other theories on your own.
+
+- You may tell the user if you disagree or see other possibilities.
+- Do not act on your own theories until you've discussed what the user thinks the root cause is.
+- Address the user's diagnosis first. Only explore alternatives if the user agrees or asks.

@@ -1,0 +1,12 @@
+---
+description: When user asks about documentation updates, check README and LEARNING_JOURNAL
+alwaysApply: true
+---
+
+# Documentation Updates
+
+When the user asks "what documentation can we update," "where do we need to make updates," or similar questions about documentation:
+
+1. **Always check** `README.md` and `LEARNING_JOURNAL.md` to see if they need updates based on recent changes or the current conversation.
+2. Propose specific updates for each file that's relevant.
+3. Do not assume documentation is complete — actively review both files for gaps.
