@@ -22,6 +22,8 @@ pip install -r requirements.txt
 
 ### Configuration
 
+**Greenhouse tab:** Add a `source` column if you use Swooped (values: `greenhouse` | `swooped`).
+
 Create a `.env` file:
 ```
 OPENAI_API_KEY=your_openai_key
@@ -178,9 +180,9 @@ Jobs are categorized into three buckets (NO numeric scoring):
   - Compliance/regulatory/GRC domains
   - Defense/military, crypto/blockchain/Web3, government sector
   - Posted salary below $180k base (see config PROFILE)
-  - Large enterprise/big tech (Microsoft, Google, Amazon, etc.) — except Netflix, Zillow
+  - Large enterprise/big tech (Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM, etc.) — except Netflix, Zillow
   - Reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply)
-  - Job description includes "No longer accepting applications" (role is closed)
+  - **Auto-rejected before LLM:** Job description or location contains "no longer accepting applications", "applications are closed", or "role is closed" — these are never sent to the scorer
 
 **Rule precedence:** Entity-level preferences override category rules (e.g. "Netflix is exception" overrides "reject large enterprises" for Netflix).
 
@@ -200,7 +202,7 @@ The Sheet has two tabs: **LinkedIn** (Gmail) and **Greenhouse** (aggregators). E
 
 **Discovery & Tracking:**
 - `job_url` - Canonicalized job URL (tracking params stripped)
-- `source` - Where the URL was discovered (Gmail, LinkedIn)
+- `source` - Where the URL was discovered (Gmail, LinkedIn, greenhouse, swooped)
 - `date_received` - When the URL was first discovered
 - `last_seen_at` - Last time the URL was seen in Gmail query
 
@@ -243,6 +245,8 @@ Both pipelines share fetch and score logic. The system is **resumable** — safe
 - **Batch Updates** — Avoids Sheets API rate limits
 - **Explicit State** — pending/fetched/failed/timeout lifecycle
 - **Column-order flexible** — Sheet writes use header names (A1 notation); you can reorder columns and writes still target the correct cells
+- **Auto-reject closed roles** — Jobs with "no longer accepting applications" (or similar) are rejected before LLM scoring
+- **Sheet append fix** — `table_range="A1"` ensures new rows append from column A even when the sheet has many empty columns
 - **Human-in-the-loop feedback** — Add preferences via `add_feedback.py` or in Cursor; learned preferences (reject/exception lists, role-level notes) are included in scoring
 
 ---

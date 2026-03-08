@@ -61,6 +61,16 @@ Only rows where:
 
 are eligible to be scored.
 
+#### Pre-filter: closed roles
+
+Before LLM scoring, jobs are auto-rejected if `job_description` or `location_text` contains any of:
+
+- "no longer accepting applications"
+- "applications are closed"
+- "role is closed"
+
+These jobs are never sent to the LLM and are bucketed as `reject` with reason "Role is closed: no longer accepting applications".
+
 ---
 
 ## Gmail ingestion
@@ -76,6 +86,7 @@ are eligible to be scored.
 - The Sheet is the system’s source of truth
 - All state transitions are written explicitly
 - Resume logic must read from the Sheet, not memory
+- `append_row` uses `table_range="A1"` so new rows always start at column A; without it, the Sheets API may detect a "table" starting at the first column with data (e.g. column O) and write there instead
 
 ---
 
