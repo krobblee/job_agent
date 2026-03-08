@@ -1,9 +1,11 @@
 """
 Greenhouse-specific upsert to the Greenhouse tab.
 
-Schema: first_seen, company, role_title, job_url, location, department,
+Schema: source, first_seen, company, role_title, job_url, location, department,
         fetch_status, fetch_attempts, last_fetch_at, fetch_error,
         job_description, job_summary, agent_bucket, agent_reasoning
+
+Add a "source" column to your Greenhouse tab if missing (greenhouse | swooped).
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ def upsert_greenhouse_jobs(sheet: SheetClient, jobs: List[GreenhouseJob]) -> int
             continue
 
         row: Dict[str, str] = {
+            "source": "greenhouse",
             "first_seen": now,
             "company": job.company_slug,
             "role_title": "",

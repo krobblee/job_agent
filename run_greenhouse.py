@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from agent.fetch_client import HttpFetcher
 from agent.fetch_manager import FetchConfig, FetchManager
 from agent.greenhouse_discovery import discover_greenhouse_jobs
+from agent.swooped_discovery import discover_swooped_jobs
 from agent.scorer import rank_jobs
 from agent.sheet_client import SheetClient, SheetConfig
 from config import (
@@ -24,10 +25,12 @@ from config import (
     GREENHOUSE_WORKSHEET,
     SHEET_ID,
     STARTUP_URLS_PATH,
+    SWOOPED_URLS_PATH,
 )
 from models import Job
 from scripts.greenhouse_snapshot import load_previous_snapshot, save_snapshot
 from scripts.greenhouse_upsert import upsert_greenhouse_jobs
+from scripts.swooped_upsert import upsert_swooped_jobs
 
 
 def _build_jobs_from_records(records: List[dict]) -> List[Job]:
@@ -36,7 +39,7 @@ def _build_jobs_from_records(records: List[dict]) -> List[Job]:
     for rec in records:
         if rec.get("fetch_status") == "fetched":
             job = Job(
-                source="greenhouse",
+                source=rec.get("source", "greenhouse"),
                 url=rec.get("job_url", ""),
                 title=rec.get("role_title"),
                 company=rec.get("company"),
@@ -74,9 +77,23 @@ def main() -> None:
     print(f"New (fresh) jobs: {len(new_jobs)}\n")
 
     if new_jobs:
-        print("=== Sheet Write ===")
+        print("=== Sheet Write (Greenhouse) ===")
         appended = upsert_greenhouse_jobs(sheet, new_jobs)
-        print(f"✓ Appended {appended} new jobs to Greenhouse tab\n")
+        print(f"✓ Appended {appended} new Greenhouse jobs\n")
+
+    # 2b. Discover and upsert Swooped jobs (full description from Swooped, no fetch needed)
+    print("=== Swooped Discovery ===")
+    swooped_jobs = discover_swooped_jobs(
+        seed_urls_path=SWOOPED_URLS_PATH,
+        timeout=30,
+        delay_between_requests=2.0,
+    )
+    if swooped_jobs:
+        print(f"  Found {len(swooped_jobs)} Swooped jobs")
+        appended_swooped = upsert_swooped_jobs(sheet, swooped_jobs)
+        print(f"✓ Appended {appended_swooped} new Swooped jobs (source=swooped)\n")
+    else:
+        print("  No Swooped jobs (or Swooped_URLs.txt empty)\n")
 
     # 3. Save snapshot
     eastern = ZoneInfo("America/New_York")
