@@ -53,15 +53,20 @@ def main() -> None:
     # 2. Discover jobs from Gmail
     print("=== Discovery ===")
     query = os.getenv("GMAIL_QUERY", "from:(jobalerts-noreply@linkedin.com) newer_than:3d")
-    discovery = GmailDiscoverySource(query=query, max_results=15)
+    max_results = int(os.getenv("GMAIL_MAX_RESULTS", "50"))
+    discovery = GmailDiscoverySource(query=query, max_results=max_results)
     jobs = discovery.discover_jobs()
-    print(f"✓ Discovered {len(jobs)} jobs\n")
+    urls = list(dict.fromkeys(j.url for j in jobs))
+    print(f"✓ Discovered {len(jobs)} jobs ({len(urls)} unique URLs)\n")
 
     # 3. Write discovered URLs to Sheet
     print("=== Sheet Write ===")
-    urls = [j.url for j in jobs]
+    urls = list(dict.fromkeys(j.url for j in jobs))
+    rows_before = len(sheet.get_all_values()) - 1  # exclude header
     upsert_pending(sheet, urls, source="gmail")
-    print(f"✓ Upserted {len(urls)} URLs\n")
+    sheet.refresh_worksheet()
+    rows_after = len(sheet.get_all_values()) - 1
+    print(f"✓ Upserted {len(urls)} URLs (rows before: {rows_before}, after: {rows_after})\n")
 
     # 4. Fetch job page content (trying normalized URLs first)
     print("=== Fetching ===")
