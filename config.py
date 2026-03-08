@@ -27,6 +27,9 @@ GREENHOUSE_WORKSHEET = os.getenv("GREENHOUSE_WORKSHEET", "Greenhouse")
 STARTUP_URLS_PATH = os.getenv("STARTUP_URLS_PATH", "data/Startup_URLs.txt")
 GREENHOUSE_SNAPSHOT_DIR = os.getenv("GREENHOUSE_SNAPSHOT_DIR", "data/snapshots")
 
+# Swooped discovery: search URLs (one per line); jobs have full description, no fetch needed
+SWOOPED_URLS_PATH = os.getenv("SWOOPED_URLS_PATH", "data/Swooped_URLs.txt")
+
 # Feedback / learned preferences
 FEEDBACK_RAW_PATH = os.getenv("FEEDBACK_RAW_PATH", "data/feedback_raw.txt")
 LEARNED_PREFERENCES_PATH = os.getenv("LEARNED_PREFERENCES_PATH", "data/learned_preferences.json")
@@ -52,7 +55,7 @@ Hard NOs:
 - Crypto / blockchain / Web3
 - Government sector / government contracting
 - Employer: Remote Hunter
-- Large enterprise / big tech companies (e.g. Microsoft, Google, Amazon) — EXCEPT: Netflix, Zillow (add others to this exceptions list as needed)
+- Large enterprise / big tech companies (e.g. Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM) — EXCEPT: Netflix, Zillow (add others to this exceptions list as needed)
 - Reposted jobs (e.g. "United States · Reposted 3 days ago") — too late to apply, too many applications
 - Job description includes "No longer accepting applications" — role is closed
 

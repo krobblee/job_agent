@@ -6,6 +6,16 @@ from config import LEARNED_PREFERENCES_PATH, PROFILE, client
 from agent.feedback_store import load_preferences
 from models import AgentDigest, ScoredJob, Job
 
+# Phrases that indicate a role is closed; auto-reject before LLM scoring
+CLOSED_ROLE_PHRASES = ("no longer accepting applications", "applications are closed", "role is closed")
+
+
+def _is_closed_role(job: Job) -> bool:
+    """Return True if job description indicates the role is closed."""
+    text = (job.job_description or "") + " " + (job.location_text or "")
+    lower = text.lower()
+    return any(phrase in lower for phrase in CLOSED_ROLE_PHRASES)
+
 
 def _format_learned_preferences() -> str:
     """Load learned preferences and format for prompt. Cap at 30 entries to avoid bloat."""
@@ -37,7 +47,7 @@ Profile:
 Decision rules:
 - TRUE MATCH: Strong fit for 0-1/greenfield, founding TPM/Product Ops, operating model transformation, SDLC/PDLC improvement, AI adoption/enablement
 - MONITOR: Partial fit, some good signals but missing key elements
-- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector, employer Remote Hunter, posted salary significantly below candidate minimum (see profile), large enterprise/big tech (Microsoft, Google, Amazon, etc.) — EXCEPT Netflix, Zillow (see profile), reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply), job description includes "No longer accepting applications" (role is closed). ALSO REJECT any role that matches the patterns in "Learned from your feedback" above — apply those patterns even when the job has other positive signals.
+- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector, employer Remote Hunter, posted salary significantly below candidate minimum (see profile), large enterprise/big tech (Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM, etc.) — EXCEPT Netflix, Zillow (see profile), reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply), job description includes "No longer accepting applications" (role is closed). ALSO REJECT any role that matches the patterns in "Learned from your feedback" above — apply those patterns even when the job has other positive signals.
 
 Jobs to analyze:
 {jobs}
@@ -92,24 +102,45 @@ def rank_jobs(jobs: list[Job]) -> tuple[AgentDigest, str]:
     if skipped:
         print(f"[rank_jobs] Skipping {skipped} jobs not fetched yet (fetch_status != 'fetched').")
 
-    if not eligible:
+    # Auto-reject closed roles (e.g. "No longer accepting applications") before LLM
+    closed, to_score = [], []
+    for j in eligible:
+        if _is_closed_role(j):
+            closed.append(j)
+        else:
+            to_score.append(j)
+    if closed:
+        print(f"[rank_jobs] Auto-rejecting {len(closed)} closed roles (no longer accepting applications).")
+
+    # Build auto-rejects for closed roles
+    auto_rejects = [
+        ScoredJob(
+            url=j.url,
+            bucket="reject",
+            why=["Role is closed: no longer accepting applications"],
+            what_to_do_next="Skip",
+        )
+        for j in closed
+    ]
+
+    if not to_score:
         empty = AgentDigest(
             true_matches=[],
             monitor=[],
-            rejects=[],
-            notes=["No fetched jobs available to score yet."]
+            rejects=auto_rejects,
+            notes=["No fetched jobs available to score yet."] if not closed else [],
         )
         return empty, ""
 
     all_true_matches = []
     all_monitor = []
-    all_rejects = []
+    all_rejects = list(auto_rejects)
     all_notes = []
     last_raw = ""
 
-    for i in range(0, len(eligible), MAX_JOBS_PER_LLM_CALL):
+    for i in range(0, len(to_score), MAX_JOBS_PER_LLM_CALL):
         batch = []
-        for j in eligible[i : i + MAX_JOBS_PER_LLM_CALL]:
+        for j in to_score[i : i + MAX_JOBS_PER_LLM_CALL]:
             j_copy = j.model_copy()
             if j_copy.job_description:
                 j_copy.job_description = j_copy.job_description[:MAX_JOB_DESCRIPTION_CHARS]
