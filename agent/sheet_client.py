@@ -150,7 +150,9 @@ class SheetClient:
         for col in header:
             val = _get_val(col)
             out.append("" if val is None else str(val))
-        self._ws.append_row(out, value_input_option="RAW")
+        # table_range='A1' forces append to start at column A; without it, the Sheets API
+        # may detect a "table" starting at the first column with data (e.g. O) and write there.
+        self._ws.append_row(out, value_input_option="RAW", table_range="A1")
 
     def update_row_cells(self, row_number: int, updates: Dict[str, Any]) -> None:
         if not self.get_header():
