@@ -1,0 +1,12 @@
+# Swooped search URLs (one per line)
+# Copy this file to Swooped_URLs.txt and add your search URLs.
+# Jobs from Swooped have full descriptions — no fetch step needed.
+# Uses "Apply on Employer Site" URL as canonical job_url for deduplication.
+#
+# To create a search URL:
+# 1. Go to https://swooped.co/app/job-postings
+# 2. Set your filters (role, location, salary, experience level, etc.)
+# 3. Copy the full URL from your browser
+# 4. Paste it below (one URL per line)
+#
+# Add your Swooped search URLs below:

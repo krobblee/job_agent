@@ -1,0 +1,13 @@
+# Aggregator URLs for discovery (one URL per line)
+# Copy this file to Startup_URLs.txt and add your job listing URLs.
+# We extract links to boards.greenhouse.io (and other ATS) from these pages.
+# Use job listing pages that have direct Apply links to ATS job postings.
+#
+# Example sources:
+# https://topstartups.io/jobs
+# https://www.workatastartup.com/jobs
+# https://wellfound.com/jobs
+# https://jobs.a16z.com/jobs
+# https://www.ycombinator.com/companies?isHiring=true
+#
+# Add your preferred aggregator URLs below (replace or add to examples):
