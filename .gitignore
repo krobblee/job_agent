@@ -18,3 +18,5 @@ data/snapshots/*.json
 
 # Optional: logs
 *.log
+scripts/debug_sheet_write.py
+scripts/test_write_scoring.py

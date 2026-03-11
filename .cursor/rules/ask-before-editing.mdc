@@ -1,0 +1,16 @@
+---
+description: Never edit without asking first — state plan and wait for approval
+alwaysApply: true
+---
+
+# Ask Before Editing
+
+**Before making any code changes:**
+
+1. State what you plan to do (which files, what changes)
+2. Wait for explicit approval or go-ahead before editing
+3. Do not assume "continue" or "implement" means proceed without a plan first
+
+If the user asks for implementation, respond with a plan and ask "Should I proceed with this?" before making edits.
+
+**Exception:** If the user explicitly says "go ahead," "make the change," or "implement it" after you've stated the plan, then proceed.

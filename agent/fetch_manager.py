@@ -66,6 +66,17 @@ class FetchManager:
         self.sheet.refresh_worksheet()
         records = self.sheet.get_all_records()
         row_index = self.sheet.build_row_index(key_col="job_url")
+
+        # Debug: log what we read from sheet
+        status_counts: Dict[str, int] = {}
+        for rec in records:
+            s = (rec.get("fetch_status") or "(empty)").strip()
+            status_counts[s] = status_counts.get(s, 0) + 1
+        print(f"  [fetch] Read {len(records)} records; fetch_status: {status_counts}")
+        if records:
+            first = records[0]
+            print(f"  [fetch] First record keys: {list(first.keys())}")
+            print(f"  [fetch] First record fetch_status={first.get('fetch_status')!r}, job_url={str(first.get('job_url', ''))[:60]}...")
         
         attempted = 0
         batch_updates: Dict[int, Dict[str, Any]] = {}  # Collect all updates for batch write
