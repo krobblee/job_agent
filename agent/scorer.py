@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 from config import LEARNED_PREFERENCES_PATH, PROFILE, client
@@ -92,6 +94,10 @@ IMPORTANT:
 
 
 def rank_jobs(jobs: list[Job]) -> tuple[AgentDigest, str]:
+    """
+    Score jobs via LLM, return AgentDigest and raw response.
+    Retries on invalid JSON; falls back to rejects if retry fails (see HANDOFF_V2).
+    """
     MAX_JOBS_PER_LLM_CALL = 10
     MAX_JOB_DESCRIPTION_CHARS = 6000
 
@@ -162,11 +168,48 @@ def rank_jobs(jobs: list[Job]) -> tuple[AgentDigest, str]:
             cleaned = cleaned.strip("`")
             cleaned = cleaned.replace("json", "", 1).strip()
 
-        # Remove control characters that break JSON parsing
-        import re
-        cleaned = re.sub(r'[\x00-\x1f\x7f]', '', cleaned)
+        # Extract JSON object (handles trailing prose from LLM)
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            cleaned = cleaned[start : end + 1]
 
-        digest = AgentDigest.model_validate_json(cleaned)
+        # Remove control characters that break JSON parsing
+        cleaned = re.sub(r"[\x00-\x1f\x7f]", "", cleaned)
+
+        try:
+            digest = AgentDigest.model_validate_json(cleaned)
+        except Exception as parse_err:
+            # Retry once with stricter prompt if JSON is invalid
+            print(f"[rank_jobs] JSON parse failed, retrying batch: {parse_err}")
+            retry_prompt = prompt + "\n\nCRITICAL: Return ONLY a single valid JSON object. No extra text before or after. Escape quotes inside strings (use \\\")."
+            retry_resp = client.responses.create(model="gpt-4.1-mini", input=retry_prompt)
+            cleaned = retry_resp.output_text.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.strip("`").replace("json", "", 1).strip()
+            start, end = cleaned.find("{"), cleaned.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                cleaned = cleaned[start : end + 1]
+            cleaned = re.sub(r"[\x00-\x1f\x7f]", "", cleaned)
+            try:
+                digest = AgentDigest.model_validate_json(cleaned)
+            except Exception as retry_err:
+                # Fallback: put all jobs in rejects so pipeline doesn't crash
+                print(f"[rank_jobs] Retry failed, putting batch in rejects: {retry_err}")
+                digest = AgentDigest(
+                    true_matches=[],
+                    monitor=[],
+                    rejects=[
+                        ScoredJob(
+                            url=j.url,
+                            bucket="reject",
+                            why=["Scoring failed: LLM returned invalid JSON"],
+                            what_to_do_next="Review manually",
+                        )
+                        for j in batch
+                    ],
+                    notes=["Scoring parse error - review jobs manually"],
+                )
         if isinstance(digest.notes, str):
             digest.notes = [digest.notes]
 

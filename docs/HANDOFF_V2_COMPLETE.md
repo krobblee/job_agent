@@ -71,6 +71,13 @@ Before LLM scoring, jobs are auto-rejected if `job_description` or `location_tex
 
 These jobs are never sent to the LLM and are bucketed as `reject` with reason "Role is closed: no longer accepting applications".
 
+#### Scoring robustness (LLM JSON parse)
+
+If the LLM returns invalid or truncated JSON, the scorer:
+1. Extracts the JSON object (between first `{` and last `}`) to handle trailing prose
+2. Retries once with a stricter prompt
+3. If retry fails, buckets all jobs in that batch as `reject` with reason "Scoring failed: LLM returned invalid JSON" — the pipeline does not crash
+
 ---
 
 ## Gmail ingestion
