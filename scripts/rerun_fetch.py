@@ -11,11 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agent.fetch_manager import FetchConfig, FetchManager
 from agent.fetch_client import HttpFetcher
 from agent.sheet_client import SheetConfig, SheetClient
-from config import LINKEDIN_WORKSHEET, SHEET_ID
+from config import EMAIL_WORKSHEET, SHEET_ID
 
 
 def main():
-    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=LINKEDIN_WORKSHEET))
+    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=EMAIL_WORKSHEET))
     sheet.refresh_worksheet()
 
     # Reset fetched rows to pending so they get re-fetched

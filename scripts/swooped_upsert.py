@@ -1,10 +1,10 @@
 """
-Swooped-specific upsert to the Greenhouse tab.
+Swooped-specific upsert to the Aggregator tab.
 
 Swooped jobs arrive with full description — no fetch step. We append with
 fetch_status=fetched so they go straight to scoring.
 
-Schema: same as Greenhouse, plus source="swooped" so you can filter by source.
+Schema: same as Aggregator, plus source="swooped" so you can filter by source.
 Uses canonical Apply URL as job_url for deduplication.
 """
 
@@ -23,7 +23,7 @@ def upsert_swooped_jobs(sheet: SheetClient, jobs: List[SwoopedJob]) -> int:
     Sets source="swooped" so you can filter by source in the Sheet.
 
     Args:
-        sheet: SheetClient configured for Greenhouse worksheet
+        sheet: SheetClient configured for Aggregator worksheet
         jobs: List of SwoopedJob (url, company, role_title, location, job_description)
 
     Returns:

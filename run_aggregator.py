@@ -1,9 +1,9 @@
 """
-Greenhouse job discovery pipeline.
+Aggregator pipeline: startup aggregators + Swooped → Sheet → Fetch → Score.
 
-Runs every 48h. Discovers Greenhouse boards from startup aggregators (Startup_URLs.txt),
-scrapes jobs, diffs against previous snapshot for freshness, and appends new jobs
-to the Greenhouse tab. Then fetches job pages and scores them.
+Discovers jobs from aggregator pages (e.g. topstartups.io) and Swooped,
+diffs against previous snapshot for freshness, appends new jobs to the
+Aggregator tab. Then fetches job pages and scores them.
 
 Pipeline: Discovery → (optional) Upsert new → Save snapshot → Fetch → Score
 """
@@ -21,15 +21,15 @@ from agent.swooped_discovery import discover_swooped_jobs
 from agent.scorer import rank_jobs
 from agent.sheet_client import SheetClient, SheetConfig
 from config import (
-    GREENHOUSE_SNAPSHOT_DIR,
-    GREENHOUSE_WORKSHEET,
+    AGGREGATOR_SNAPSHOT_DIR,
+    AGGREGATOR_WORKSHEET,
     SHEET_ID,
     STARTUP_URLS_PATH,
     SWOOPED_URLS_PATH,
 )
 from models import Job
-from scripts.greenhouse_snapshot import load_previous_snapshot, save_snapshot
-from scripts.greenhouse_upsert import upsert_greenhouse_jobs
+from scripts.aggregator_snapshot import load_previous_snapshot, save_snapshot
+from scripts.aggregator_upsert import upsert_aggregator_jobs
 from scripts.swooped_upsert import upsert_swooped_jobs
 
 
@@ -52,37 +52,26 @@ def _build_jobs_from_records(records: List[dict]) -> List[Job]:
 
 
 def main() -> None:
-    print("=== Greenhouse Pipeline ===\n")
+    print("=== Aggregator Pipeline ===\n")
 
-    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=GREENHOUSE_WORKSHEET))
+    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=AGGREGATOR_WORKSHEET))
 
-    # 1. Discover all Greenhouse jobs
-    print("=== Discovery ===")
-    jobs = discover_greenhouse_jobs(
+    # 1. Discover jobs from aggregators (scraping)
+    print("=== Aggregator Discovery ===")
+    aggregator_jobs = discover_greenhouse_jobs(
         seed_urls_path=STARTUP_URLS_PATH,
         timeout=15,
         delay_between_requests=2.0,
     )
-    if not jobs:
-        print("No jobs discovered. Add aggregator URLs to data/Startup_URLs.txt (one per line)")
-        return
+    if aggregator_jobs:
+        current_urls = {j.url for j in aggregator_jobs}
+        print(f"\nAggregator scraping: {len(aggregator_jobs)} jobs")
+    else:
+        current_urls = set()
+        print("\nAggregator scraping: 0 jobs")
 
-    current_urls = {j.url for j in jobs}
-    print(f"\nTotal jobs this run: {len(jobs)}\n")
-
-    # 2. Delta and upsert new jobs
-    previous_urls = load_previous_snapshot(GREENHOUSE_SNAPSHOT_DIR)
-    new_jobs = [j for j in jobs if j.url not in previous_urls]
-    print(f"Previous snapshot: {len(previous_urls)} URLs")
-    print(f"New (fresh) jobs: {len(new_jobs)}\n")
-
-    if new_jobs:
-        print("=== Sheet Write (Greenhouse) ===")
-        appended = upsert_greenhouse_jobs(sheet, new_jobs)
-        print(f"✓ Appended {appended} new Greenhouse jobs\n")
-
-    # 2b. Discover and upsert Swooped jobs (full description from Swooped, no fetch needed)
-    print("=== Swooped Discovery ===")
+    # 2. Discover Swooped jobs (always run — better quality, full descriptions)
+    print("\n=== Swooped Discovery ===")
     swooped_jobs = discover_swooped_jobs(
         seed_urls_path=SWOOPED_URLS_PATH,
         timeout=30,
@@ -95,14 +84,31 @@ def main() -> None:
     else:
         print("  No Swooped jobs (or Swooped_URLs.txt empty)\n")
 
-    # 3. Save snapshot
-    eastern = ZoneInfo("America/New_York")
-    save_snapshot(
-        GREENHOUSE_SNAPSHOT_DIR,
-        datetime.now(eastern).strftime("%Y-%m-%d"),
-        list(current_urls),
-    )
-    print(f"✓ Snapshot saved ({len(current_urls)} URLs)\n")
+    # 3. Delta and upsert new aggregator jobs
+    if aggregator_jobs:
+        previous_urls = load_previous_snapshot(AGGREGATOR_SNAPSHOT_DIR)
+        new_jobs = [j for j in aggregator_jobs if j.url not in previous_urls]
+        print(f"Previous snapshot: {len(previous_urls)} aggregator URLs")
+        print(f"New (fresh) aggregator jobs: {len(new_jobs)}\n")
+
+        if new_jobs:
+            print("=== Sheet Write (Aggregator) ===")
+            appended = upsert_aggregator_jobs(sheet, new_jobs)
+            print(f"✓ Appended {appended} new aggregator jobs\n")
+
+        # Save snapshot (aggregator scraping only)
+        eastern = ZoneInfo("America/New_York")
+        save_snapshot(
+            AGGREGATOR_SNAPSHOT_DIR,
+            datetime.now(eastern).strftime("%Y-%m-%d"),
+            list(current_urls),
+        )
+        print(f"✓ Snapshot saved ({len(current_urls)} aggregator URLs)\n")
+
+    # Exit only if both sources found nothing
+    if not aggregator_jobs and not swooped_jobs:
+        print("No jobs discovered from aggregators or Swooped. Add URLs to data/Startup_URLs.txt and data/Swooped_URLs.txt")
+        return
 
     # 4. Fetch pending job pages
     print("=== Fetching ===")

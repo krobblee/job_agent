@@ -1,3 +1,10 @@
+"""
+Email pipeline: Gmail job alerts → Sheet → Fetch → Score.
+
+Discovers jobs from Gmail (e.g., LinkedIn job alerts), upserts to the Email tab,
+fetches job pages, and scores them.
+"""
+
 from __future__ import annotations
 
 import os
@@ -9,7 +16,7 @@ from agent.fetch_client import HttpFetcher
 from agent.fetch_manager import FetchConfig, FetchManager
 from agent.scorer import rank_jobs
 from agent.sheet_client import SheetClient, SheetConfig
-from config import LINKEDIN_WORKSHEET, SHEET_ID
+from config import EMAIL_WORKSHEET, SHEET_ID
 from models import Job
 
 # Import upsert_pending logic
@@ -41,13 +48,12 @@ def _build_jobs_from_records(records: List[dict]) -> List[Job]:
 
 def main() -> None:
     """
-    Main job agent pipeline orchestrator.
-    
-    Pipeline: Discovery → Sheet write → Fetch → Score → Sheet update
+    Email pipeline: Discovery → Sheet write → Fetch → Score → Sheet update
     """
     # 1. Initialize Sheet (source of truth)
+    print("=== Email Pipeline ===\n")
     print("=== Initializing Sheet ===")
-    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=LINKEDIN_WORKSHEET))
+    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=EMAIL_WORKSHEET))
     print("✓ Connected\n")
 
     # 2. Discover jobs from Gmail
@@ -70,7 +76,7 @@ def main() -> None:
 
     # 4. Fetch job page content (trying normalized URLs first)
     print("=== Fetching ===")
-    http_fetcher = HttpFetcher(delay_between_requests=2.0)  # Slower to be nice to LinkedIn
+    http_fetcher = HttpFetcher(delay_between_requests=2.0)
     fetch_manager = FetchManager(sheet, FetchConfig(max_rows_per_run=25), fetch_client=http_fetcher)
     attempted = fetch_manager.fetch_pending_jobs()
     print(f"✓ Fetched {attempted} jobs\n")

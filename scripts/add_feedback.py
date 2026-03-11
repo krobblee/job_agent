@@ -9,8 +9,8 @@ Flow:
 5. If parse succeeds, add to structured store (dedupe, anti-contradiction)
 
 Usage:
-  python scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
-  python scripts/add_feedback.py "Netflix is fine though"
+  python3 scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
+  python3 scripts/add_feedback.py "Netflix is fine though"
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def store_raw(raw_path: Path, feedback: str) -> None:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("Usage: python scripts/add_feedback.py \"<feedback text>\"")
+        print("Usage: python3 scripts/add_feedback.py \"<feedback text>\"")
         return 1
 
     feedback = " ".join(sys.argv[1:]).strip()

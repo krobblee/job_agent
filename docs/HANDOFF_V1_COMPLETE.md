@@ -233,7 +233,7 @@ Canonicalize LinkedIn job URLs by stripping all query parameters
 
 Private GitHub repo: job_agent
 
-Entrypoint: run_agent.py
+Entrypoint: run_email.py (Email pipeline); run_aggregator.py (Aggregator pipeline)
 
 7.2 Gmail OAuth
 

@@ -1,5 +1,5 @@
 """
-Snapshot storage for Greenhouse delta-based freshness.
+Snapshot storage for Aggregator pipeline delta-based freshness.
 
 Stores the set of job URLs from each run. Next run diffs against this
 to determine which jobs are "new" (posted since last run).
@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 
-SNAPSHOT_FILENAME = "greenhouse_previous.json"
+SNAPSHOT_FILENAME = "aggregator_previous.json"
 
 
 def load_previous_snapshot(snapshot_dir: str) -> set[str]:

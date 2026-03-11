@@ -1,6 +1,6 @@
 # Job Agent
 
-A job-search agent that ingests jobs from Gmail and startup aggregators (e.g. topstartups.io), deduplicates and tracks postings via a Google Sheet, fetches and parses job pages, and scores eligible roles against a candidate profile. Supports separate pipelines for LinkedIn (Gmail) and Greenhouse (ATS) jobs.
+A job-search agent that ingests jobs from Gmail and startup aggregators (e.g. topstartups.io), deduplicates and tracks postings via a Google Sheet, fetches and parses job pages, and scores eligible roles against a candidate profile. Supports two pipelines: **Email** (Gmail job alerts) and **Aggregator** (scraping + Swooped).
 
 The system is resumable, inspectable, and safe to run repeatedly without silent drops or duplicate work.
 
@@ -9,20 +9,22 @@ The system is resumable, inspectable, and safe to run repeatedly without silent 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.9+
-- Gmail API credentials (`gmail_credentials.json`) — for LinkedIn pipeline
+- Python 3.9+ (use `python3` and `pip3` — on many systems `python` points to Python 2 or doesn't exist)
+- Gmail API credentials (`gmail_credentials.json`) — for Email pipeline
 - Google Service Account credentials (`credentials/service_account.json`)
-- Google Sheet with two tabs: LinkedIn, Greenhouse
+- Google Sheet with two tabs: **Email**, **Aggregator**
 
 ### Installation
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
+# Aggregator pipeline uses Swooped (Playwright). Install Chromium:
+playwright install chromium
 ```
 
 ### Configuration
 
-**Greenhouse tab:** Add a `source` column if you use Swooped (values: `greenhouse` | `swooped`).
+**Aggregator tab:** Add a `source` column if you use Swooped (values: `greenhouse` | `swooped`).
 
 Create a `.env` file:
 ```
@@ -31,29 +33,30 @@ SHEET_ID=your_google_sheet_id
 
 # Optional — defaults shown
 GMAIL_QUERY=from:(jobalerts-noreply@linkedin.com) newer_than:3d
-LINKEDIN_WORKSHEET=Sheet1
-GREENHOUSE_WORKSHEET=Greenhouse
+EMAIL_WORKSHEET=Email
+AGGREGATOR_WORKSHEET=Aggregator
+AGGREGATOR_SNAPSHOT_DIR=data/snapshots
 ```
 
-For Greenhouse discovery, add aggregator URLs to `data/Startup_URLs.txt` (one per line). Use job listing pages that link directly to ATS job pages — e.g. `https://topstartups.io/jobs`.
+For Aggregator discovery, add URLs to `data/Startup_URLs.txt` and `data/Swooped_URLs.txt` (one per line). Use job listing pages that link directly to ATS job pages — e.g. `https://topstartups.io/jobs`.
 
 ### Run
 
 ```bash
-# LinkedIn pipeline (Gmail → Sheet → Fetch → Score)
-python run_agent.py
+# Email pipeline (Gmail → Sheet → Fetch → Score)
+python3 run_email.py
 
-# Greenhouse pipeline (Aggregators → Sheet → Fetch → Score)
-python run_greenhouse.py
+# Aggregator pipeline (Aggregators + Swooped → Sheet → Fetch → Score)
+python3 run_aggregator.py
 
-# Rescore only (no discovery/fetch) — use when profile/config changed
-python scripts/rescore.py
+# Rescore Email sheet only (no discovery/fetch) — use when profile/config changed
+python3 scripts/rescore.py
 
-# Re-fetch all (reset fetched → pending, then fetch) — use after parser changes
-python scripts/rerun_fetch.py
+# Re-fetch Email sheet (reset fetched → pending, then fetch) — use after parser changes
+python3 scripts/rerun_fetch.py
 
 # Add feedback for the agent to learn (in Cursor: "add to feedback: I rejected Microsoft")
-python scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
+python3 scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
 ```
 
 ---
@@ -62,16 +65,16 @@ python scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
 
 Two pipelines share the same Sheet and scoring logic:
 
-### LinkedIn pipeline (`run_agent.py`)
+### Email pipeline (`run_email.py`)
 1. **Discovery** — Gmail job alerts → extract URLs, strip `/comm/` tracking
-2. **Storage** — Upsert to LinkedIn tab
-3. **Fetch** → **Score** — Same as Greenhouse
+2. **Storage** — Upsert to Email tab
+3. **Fetch** → **Score** — Same as Aggregator
 
-### Greenhouse pipeline (`run_greenhouse.py`)
-1. **Discovery** — Scrape aggregator pages (e.g. topstartups.io/jobs) → extract direct Greenhouse job URLs
+### Aggregator pipeline (`run_aggregator.py`)
+1. **Discovery** — Scrape aggregator pages (e.g. topstartups.io/jobs) + Swooped → extract direct ATS job URLs
 2. **Delta** — Compare vs previous snapshot; only new URLs are "fresh" (posted since last run)
-3. **Storage** — Append new jobs to Greenhouse tab
-4. **Fetch** → **Score** — Same as LinkedIn
+3. **Storage** — Append new jobs to Aggregator tab
+4. **Fetch** → **Score** — Same as Email
 
 ### Shared
 - **Storage & resume** — Google Sheet is the single source of truth; explicit fetch_status lifecycle
@@ -84,18 +87,18 @@ Two pipelines share the same Sheet and scoring logic:
 
 ```
 job-agent/
-├── run_agent.py              # LinkedIn pipeline (Gmail → Fetch → Score)
-├── run_greenhouse.py         # Greenhouse pipeline (Aggregators → Fetch → Score)
-├── config.py                 # Settings, PROFILE, worksheet names
-├── models.py                 # Job, ScoredJob, AgentDigest
+├── run_email.py               # Email pipeline (Gmail → Fetch → Score)
+├── run_aggregator.py          # Aggregator pipeline (Aggregators + Swooped → Fetch → Score)
+├── config.py                  # Settings, PROFILE, worksheet names
+├── models.py                  # Job, ScoredJob, AgentDigest
 ├── requirements.txt
 ├── .env
 │
 ├── agent/
-│   ├── discovery.py          # Gmail job discovery
-│   ├── feedback_parser.py    # Parse free-form feedback into FeedbackPreference
-│   ├── feedback_store.py     # Load/save learned_preferences.json
-│   ├── greenhouse_discovery.py  # Scrape aggregators for Greenhouse job URLs
+│   ├── discovery.py           # Gmail job discovery
+│   ├── feedback_parser.py     # Parse free-form feedback into FeedbackPreference
+│   ├── feedback_store.py      # Load/save learned_preferences.json
+│   ├── greenhouse_discovery.py  # Scrape aggregators for ATS job URLs
 │   ├── sheet_client.py
 │   ├── fetch_manager.py
 │   ├── fetch_client.py
@@ -103,19 +106,21 @@ job-agent/
 │   └── scorer.py
 │
 ├── data/
-│   ├── Startup_URLs.txt        # Aggregator URLs for Greenhouse discovery
-│   ├── feedback_raw.txt         # Raw feedback (stored first, never lost)
+│   ├── Startup_URLs.txt       # Aggregator URLs for discovery
+│   ├── Swooped_URLs.txt       # Swooped search URLs
+│   ├── feedback_raw.txt       # Raw feedback (stored first, never lost)
 │   ├── learned_preferences.json  # Structured preferences (reject/exception lists, notes)
-│   └── snapshots/            # Greenhouse delta snapshots (by run)
+│   └── snapshots/             # Aggregator delta snapshots (by run)
 │
 ├── scripts/
 │   ├── add_feedback.py    # Add feedback: parse → dedupe → store
-│   ├── greenhouse_upsert.py
-│   ├── greenhouse_snapshot.py
+│   ├── aggregator_snapshot.py
+│   ├── aggregator_upsert.py
 │   ├── normalize_comm_urls.py
 │   ├── rerun_fetch.py     # Reset fetched rows and re-fetch (e.g. after parser changes)
-│   ├── rescore.py         # Rescore all fetched jobs without discovery/fetch
+│   ├── rescore.py         # Rescore Email sheet (no discovery/fetch)
 │   ├── run_fetch_once.py
+│   ├── swooped_upsert.py
 │   └── upsert_pending.py
 │
 └── credentials/
@@ -198,11 +203,11 @@ Email-derived context must not be scored once job-page fetching is implemented.
 
 The Google Sheet is the system’s persistent data model and source of truth.
 
-The Sheet has two tabs: **LinkedIn** (Gmail) and **Greenhouse** (aggregators). Each row = one job URL. Greenhouse uses `first_seen` and `company` (board slug); LinkedIn uses `date_received`, `last_seen_at`.
+The Sheet has two tabs: **Email** (Gmail) and **Aggregator** (scraping + Swooped). Each row = one job URL. Aggregator uses `first_seen` and `company` (board slug); Email uses `date_received`, `last_seen_at`.
 
 **Discovery & Tracking:**
 - `job_url` - Canonicalized job URL (tracking params stripped)
-- `source` - Where the URL was discovered (Gmail, LinkedIn, greenhouse, swooped)
+- `source` - Where the URL was discovered (gmail, greenhouse, swooped)
 - `date_received` - When the URL was first discovered
 - `last_seen_at` - Last time the URL was seen in Gmail query
 
@@ -228,9 +233,9 @@ The Sheet has two tabs: **LinkedIn** (Gmail) and **Greenhouse** (aggregators). E
 
 ## How It Works
 
-**LinkedIn** (`run_agent.py`): Gmail → discover URLs → upsert to Sheet → fetch → score
+**Email** (`run_email.py`): Gmail → discover URLs → upsert to Sheet → fetch → score
 
-**Greenhouse** (`run_greenhouse.py`): Scrape aggregators → delta vs previous snapshot → append new jobs → fetch → score. Run every 48h to capture fresh postings.
+**Aggregator** (`run_aggregator.py`): Scrape aggregators + Swooped → delta vs previous snapshot → append new jobs → fetch → score. Run every 48h to capture fresh postings.
 
 Both pipelines share fetch and score logic. The system is **resumable** — safe to run repeatedly.
 
@@ -238,8 +243,8 @@ Both pipelines share fetch and score logic. The system is **resumable** — safe
 
 ## Key Features
 
-- **Dual pipelines** — LinkedIn (Gmail) and Greenhouse (aggregator scraping); separate tabs, shared fetch/score
-- **Greenhouse freshness** — Delta-based discovery (run every 48h; new URLs = fresh jobs)
+- **Dual pipelines** — Email (Gmail) and Aggregator (scraping + Swooped); separate tabs, shared fetch/score
+- **Aggregator freshness** — Delta-based discovery (run every 48h; new URLs = fresh jobs)
 - **Profile hard NOs** — Defense, crypto, government excluded from true_match
 - **URL Normalization** — Strips `/comm/` from LinkedIn URLs
 - **Batch Updates** — Avoids Sheets API rate limits
@@ -255,7 +260,7 @@ Both pipelines share fetch and score logic. The system is **resumable** — safe
 
 The agent learns from your feedback. Add company-level or role-level preferences:
 
-- **Company reject/exception:** `python scripts/add_feedback.py "I won't work at Microsoft"` or `"Netflix is an exception"`
+- **Company reject/exception:** `python3 scripts/add_feedback.py "I won't work at Microsoft"` or `"Netflix is an exception"`
 - **Role-level notes:** Tell Cursor "add to feedback: [your note]" — omit company name when the rejection is about the role type (e.g. project-level not program-level, hands-on data flows) so the pattern applies broadly
 
 Feedback is stored in `data/learned_preferences.json` (reject list, exception list, notes). Raw feedback is always stored first in `data/feedback_raw.txt`. Entity rules override category rules (e.g. Netflix overrides "reject large enterprises").

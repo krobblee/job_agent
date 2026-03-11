@@ -1,11 +1,11 @@
 """
-Greenhouse-specific upsert to the Greenhouse tab.
+Aggregator upsert: append jobs from aggregator scraping to the Aggregator tab.
 
 Schema: source, first_seen, company, role_title, job_url, location, department,
         fetch_status, fetch_attempts, last_fetch_at, fetch_error,
         job_description, job_summary, agent_bucket, agent_reasoning
 
-Add a "source" column to your Greenhouse tab if missing (greenhouse | swooped).
+Add a "source" column to your Aggregator tab if missing (greenhouse | swooped).
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ from agent.greenhouse_discovery import GreenhouseJob
 from agent.sheet_client import SheetClient, utc_now_iso
 
 
-def upsert_greenhouse_jobs(sheet: SheetClient, jobs: List[GreenhouseJob]) -> int:
+def upsert_aggregator_jobs(sheet: SheetClient, jobs: List[GreenhouseJob]) -> int:
     """
-    Append new Greenhouse jobs to the sheet. Skips URLs already present.
+    Append new aggregator jobs to the sheet. Skips URLs already present.
 
     Args:
-        sheet: SheetClient configured for Greenhouse worksheet
+        sheet: SheetClient configured for Aggregator worksheet
         jobs: List of GreenhouseJob (url + company_slug)
 
     Returns:

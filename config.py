@@ -20,12 +20,12 @@ if not SHEET_ID:
     raise ValueError("SHEET_ID must be set in .env file")
 
 # Worksheet (tab) names
-LINKEDIN_WORKSHEET = os.getenv("LINKEDIN_WORKSHEET", "Sheet1")
-GREENHOUSE_WORKSHEET = os.getenv("GREENHOUSE_WORKSHEET", "Greenhouse")
+EMAIL_WORKSHEET = os.getenv("EMAIL_WORKSHEET", "Email")
+AGGREGATOR_WORKSHEET = os.getenv("AGGREGATOR_WORKSHEET", "Aggregator")
 
-# Greenhouse discovery: aggregator URLs (one per line)
+# Aggregator discovery: aggregator URLs (one per line)
 STARTUP_URLS_PATH = os.getenv("STARTUP_URLS_PATH", "data/Startup_URLs.txt")
-GREENHOUSE_SNAPSHOT_DIR = os.getenv("GREENHOUSE_SNAPSHOT_DIR", "data/snapshots")
+AGGREGATOR_SNAPSHOT_DIR = os.getenv("AGGREGATOR_SNAPSHOT_DIR", "data/snapshots")
 
 # Swooped discovery: search URLs (one per line); jobs have full description, no fetch needed
 SWOOPED_URLS_PATH = os.getenv("SWOOPED_URLS_PATH", "data/Swooped_URLs.txt")
@@ -55,6 +55,7 @@ Hard NOs:
 - Crypto / blockchain / Web3
 - Government sector / government contracting
 - Employer: Remote Hunter
+- Hybrid / onsite requirements (e.g. "3 days per week in office", "hybrid onsite", "onsite in [city]") — candidate wants remote or flexible
 - Large enterprise / big tech companies (e.g. Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM) — EXCEPT: Netflix, Zillow (add others to this exceptions list as needed)
 - Reposted jobs (e.g. "United States · Reposted 3 days ago") — too late to apply, too many applications
 - Job description includes "No longer accepting applications" — role is closed

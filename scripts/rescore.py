@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agent.scorer import rank_jobs
 from agent.sheet_client import SheetClient, SheetConfig
-from config import LINKEDIN_WORKSHEET, SHEET_ID
+from config import EMAIL_WORKSHEET, SHEET_ID
 from models import Job
 
 
@@ -32,7 +32,7 @@ def _build_jobs_from_records(records: list) -> list[Job]:
 
 
 def main():
-    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=LINKEDIN_WORKSHEET))
+    sheet = SheetClient(SheetConfig(sheet_id=SHEET_ID, worksheet_title=EMAIL_WORKSHEET))
     sheet.refresh_worksheet()
 
     records = sheet.get_all_records()

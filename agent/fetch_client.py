@@ -106,7 +106,7 @@ class BrowserFetcher:
     for sites like LinkedIn that block simple requests.
     
     Installation required:
-        pip install playwright
+        pip3 install playwright
         playwright install chromium
     """
     
