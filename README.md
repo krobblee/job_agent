@@ -14,6 +14,16 @@ The system is resumable, inspectable, and safe to run repeatedly without silent 
 - Google Service Account credentials (`credentials/service_account.json`)
 - Google Sheet with two tabs: **Email**, **Aggregator**
 
+### First-time setup
+
+Before running the Email pipeline, you need Gmail API and Google Sheets credentials. See **[SETUP.md](SETUP.md)** for step-by-step instructions:
+
+- Creating a Google Cloud project
+- Enabling Gmail API and creating OAuth credentials
+- Creating a service account for the Google Sheet
+- Creating and sharing the Sheet
+- First-run OAuth flow (browser opens to authorize Gmail access)
+
 ### Installation
 
 ```bash
@@ -23,6 +33,8 @@ playwright install chromium
 ```
 
 ### Configuration
+
+**Profile:** Copy `data/profile.example.txt` to `data/profile.txt` and customize with your experience, salary range, preferences, and hard NOs. The profile is used for scoring and is never committed (gitignored).
 
 **Aggregator tab:** Add a `source` column if you use Swooped (values: `greenhouse` | `swooped`).
 
@@ -35,10 +47,11 @@ SHEET_ID=your_google_sheet_id
 GMAIL_QUERY=from:(jobalerts-noreply@linkedin.com) newer_than:3d
 EMAIL_WORKSHEET=Email
 AGGREGATOR_WORKSHEET=Aggregator
+PROFILE_PATH=data/profile.txt
 AGGREGATOR_SNAPSHOT_DIR=data/snapshots
 ```
 
-For Aggregator discovery, add URLs to `data/Startup_URLs.txt` and `data/Swooped_URLs.txt` (one per line). Use job listing pages that link directly to ATS job pages — e.g. `https://topstartups.io/jobs`.
+For Aggregator discovery, copy `data/Startup_URLs.example.txt` to `data/Startup_URLs.txt` and `data/Swooped_URLs.example.txt` to `data/Swooped_URLs.txt`, then add your URLs. Use job listing pages that link directly to ATS job pages.
 
 ### Run
 
