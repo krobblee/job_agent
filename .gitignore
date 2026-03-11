@@ -12,9 +12,19 @@ credentials/
 gmail_credentials.json
 gmail_token.json
 
-# Local data
+# Local data (user-specific, never commit)
 jobs.db
 data/snapshots/*.json
+data/profile.txt
+data/feedback_raw.txt
+data/learned_preferences.json
+data/Startup_URLs.txt
+data/Swooped_URLs.txt
+LEARNING_JOURNAL.md
+
+# BFG / history cleanup
+replacements.txt
+bfg.jar
 
 # Optional: logs
 *.log
