@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -34,31 +35,31 @@ SWOOPED_URLS_PATH = os.getenv("SWOOPED_URLS_PATH", "data/Swooped_URLs.txt")
 FEEDBACK_RAW_PATH = os.getenv("FEEDBACK_RAW_PATH", "data/feedback_raw.txt")
 LEARNED_PREFERENCES_PATH = os.getenv("LEARNED_PREFERENCES_PATH", "data/learned_preferences.json")
 
-PROFILE = """
-Candidate profile (high level):
-- 15 years TPM / Product Ops experience
+# Candidate profile: path to a text file (default data/profile.txt)
+PROFILE_PATH = os.getenv("PROFILE_PATH", "data/profile.txt")
 
-Salary requirements:
-- Reject if posted salary/compensation is stated and below $180k base (minimum; higher for leadership)
-- If salary is not posted, do not reject solely on that basis (can apply and negotiate)
-- Wants to lead digital transformation: improve PDLC/SDLC, workflows, operating model, and execution predictability
-- Strong interest in AI-enabled transformation: adopting AI tools/agents, redefining roles & responsibilities for engineers and PMs, helping teams manage agents and work more strategically
-- Strong preference for 0-1 / greenfield / building new software and new capabilities
-- Loves ambiguity: come into chaos, create clarity, operating cadence, and measurable execution
-- Would love to be a founding member / first hire of TPM or Product Operations function
 
-Hard NOs:
-- Compliance-heavy/regulatory/legal/GRC domains
-- Implementation / onboarding / professional services / customer delivery roles
-- Infrastructure, migrations, architecture, platform-heavy work
-- Defense / defense contractors / military
-- Crypto / blockchain / Web3
-- Government sector / government contracting
-- Employer: Remote Hunter
-- Hybrid / onsite requirements (e.g. "3 days per week in office", "hybrid onsite", "onsite in [city]") — candidate wants remote or flexible
-- Large enterprise / big tech companies (e.g. Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM) — EXCEPT: Netflix, Zillow (add others to this exceptions list as needed)
-- Reposted jobs (e.g. "United States · Reposted 3 days ago") — too late to apply, too many applications
-- Job description includes "No longer accepting applications" — role is closed
+def _load_profile() -> str:
+    """Load profile from PROFILE_PATH. Raises if file does not exist or is empty."""
+    path = Path(PROFILE_PATH)
+    if not path.exists():
+        if PROFILE_PATH == "data/profile.txt":
+            raise FileNotFoundError(
+                f"Profile file not found at {PROFILE_PATH}. "
+                "Copy data/profile.example.txt to data/profile.txt and customize it."
+            )
+        raise FileNotFoundError(
+            f"Profile file not found at {PROFILE_PATH}. "
+            "Create the file or set PROFILE_PATH to your profile file path."
+        )
+    content = path.read_text(encoding="utf-8").strip()
+    if len(content) < 50:
+        raise ValueError(
+            f"Profile at {PROFILE_PATH} appears empty or too short. "
+            "Add your experience, salary range, preferences, and hard NOs. "
+            "See data/profile.example.txt for structure."
+        )
+    return content
 
-Rule precedence: Entity-level preferences override category rules. E.g. "reject large enterprises" is a category rule; "Netflix is exception" is an entity rule — for Netflix, the entity rule wins.
-"""
+
+PROFILE = _load_profile()

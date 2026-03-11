@@ -1,0 +1,20 @@
+# Copy this file to data/profile.txt and customize. Never commit profile.txt (it's gitignored).
+#
+Candidate profile (high level):
+- [Your experience: years, role type, domain]
+
+Salary requirements:
+- Reject if posted salary is stated and below [your minimum]
+- If salary is not posted, do not reject solely on that basis
+
+[Your preferences: role type, company stage, work style, etc.]
+
+Hard NOs:
+- [Domains/industries you won't consider]
+- [Role types to avoid: e.g. implementation, compliance-heavy]
+- [Work arrangement: e.g. hybrid/onsite if you want remote only]
+- [Company size/type: e.g. large enterprise if you prefer startups]
+- Reposted jobs — too late to apply
+- Job description includes "No longer accepting applications" — role is closed
+
+Rule precedence: Entity-level preferences override category rules. E.g. "reject large enterprises" (category) vs "Company X is exception" (entity) — for Company X, the entity rule wins.
