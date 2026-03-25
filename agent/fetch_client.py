@@ -148,8 +148,13 @@ class BrowserFetcher:
                 # Navigate to URL with timeout
                 page.goto(url, timeout=timeout_seconds * 1000, wait_until="domcontentloaded")
                 
-                # Wait a bit for dynamic content to load
-                page.wait_for_timeout(2000)  # 2 seconds
+                # Wait for job content to render (Gem, Darwinbox, etc. are JS-rendered)
+                # Many job pages have h1 with the role title; wait for it before extracting
+                try:
+                    page.wait_for_selector("h1", timeout=8000, state="visible")
+                except Exception:
+                    pass  # fallback: use whatever is in DOM
+                page.wait_for_timeout(1500)  # extra buffer for description content
                 
                 # Get full page content
                 content = page.content()

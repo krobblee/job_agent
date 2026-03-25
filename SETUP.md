@@ -106,7 +106,7 @@ When you run `python3 run_email.py` for the first time:
 
 1. Go to [Google Sheets](https://sheets.google.com/) and create a new spreadsheet
 2. Rename it (e.g. "Job Agent")
-3. Create two tabs: **Email** and **Aggregator**
+3. Create tabs: **Email** and **Aggregator** (required). If you use the Companies pipeline, also add **Company List** and **Company Jobs** (see [Optional: Companies pipeline](#optional-companies-pipeline) below).
 4. Add the required headers in row 1 (see below)
 
 ### Share with the service account
@@ -138,6 +138,54 @@ Copy this ID for your `.env` file.
 | source | first_seen | company | role_title | job_url | location | department | fetch_status | fetch_attempts | last_fetch_at | fetch_error | job_description | job_summary | agent_bucket | agent_reasoning |
 
 You can add more columns; the agent uses header names to find the right cells.
+
+---
+
+## Optional: Companies pipeline
+
+Use this when you want to track roles from specific employers via a curated list (no Gmail required for discovery).
+
+### Tabs and headers
+
+Add two tabs if you don’t have them yet:
+
+**Company List** (row 1):
+
+| company | company_url | career_site_url | last_error |
+
+**Company Jobs** — use the **same header row as the Aggregator tab** (see [Required columns](#required-columns) → Aggregator).
+
+In `.env`, set tab names if yours differ (defaults match the names above):
+
+| Variable | Description |
+|----------|-------------|
+| `COMPANIES_LIST_WORKSHEET` | Tab name for Company List (default: `Company List`) |
+| `COMPANIES_JOBS_WORKSHEET` | Tab name for Company Jobs (default: `Company Jobs`) |
+
+### How to fill **Company List** (important)
+
+- **`career_site_url` (required for best results)** — Paste the **direct URL of the hosted job board** (the page that actually lists open roles on the ATS), for example:
+  - Ashby: `https://jobs.ashbyhq.com/yourcompany`
+  - Greenhouse: your `boards.greenhouse.io/...` or `job-boards.greenhouse.io/...` jobs listing URL
+  - Lever: `https://jobs.lever.co/yourcompany`
+  - Gem: `https://jobs.gem.com/yourcompany` (or whatever Gem shows for “all jobs”)
+  - Other ATS boards (Workday, Darwinbox, etc.) — the **listing** URL, not a single job posting
+
+  **Avoid** using only the marketing site’s generic careers landing page (e.g. `https://company.com/careers` or `/jobs`) as your main strategy. Those pages often embed or link to the real board; discovery is tuned for the **board URL** first.
+
+- **`company_url` (optional)** — Main company website. The pipeline may use it as a **fallback** if `career_site_url` fails (e.g. to find a careers link). It is **not** the default path; the reliable approach is to put the job board URL in `career_site_url`.
+
+- **`company`** — Human-readable name (used when writing rows to Company Jobs).
+
+- **`last_error`** — Leave empty; the agent writes errors here when discovery fails.
+
+### Run
+
+- **Playwright** — Company job pages are often JS-rendered; install browsers: `playwright install chromium` (see README Installation).
+
+```bash
+python3 run_companies.py
+```
 
 ---
 
@@ -173,6 +221,8 @@ Copy `.env.example` to `.env` and fill in:
 | `STARTUP_URLS_PATH` | Aggregator URLs file (default: data/Startup_URLs.txt) |
 | `SWOOPED_URLS_PATH` | Swooped search URLs (default: data/Swooped_URLs.txt) |
 | `AGGREGATOR_SNAPSHOT_DIR` | For delta freshness (default: data/snapshots) |
+| `COMPANIES_LIST_WORKSHEET` | Company List tab (default: Company List) — see [Optional: Companies pipeline](#optional-companies-pipeline) |
+| `COMPANIES_JOBS_WORKSHEET` | Company Jobs tab (default: Company Jobs) |
 
 ### Profile
 

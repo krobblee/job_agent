@@ -38,8 +38,24 @@ def _format_learned_preferences() -> str:
     return "Learned from your feedback:\n" + "\n".join(lines) + "\n\n"
 
 
+def _format_job_for_prompt(job: Job) -> str:
+    """Format a Job for clear LLM consumption. Avoids relying on Pydantic repr."""
+    parts = [
+        f"URL: {job.url}",
+        f"Title: {job.title or '(none)'}",
+        f"Company: {job.company or '(none)'}",
+        f"Location: {job.location_text or '(none)'}",
+    ]
+    if job.job_description:
+        parts.append(f"Job Description:\n{job.job_description}")
+    else:
+        parts.append("Job Description: (empty)")
+    return "\n".join(parts)
+
+
 def build_prompt(jobs: list[Job]) -> str:
     learned = _format_learned_preferences()
+    jobs_text = "\n\n---\n\n".join(f"Job {i+1}:\n{_format_job_for_prompt(j)}" for i, j in enumerate(jobs))
     return f"""
 You are a job-search agent analyzing job postings for a candidate.
 
@@ -47,12 +63,12 @@ Profile:
 {PROFILE}
 {learned}
 Decision rules:
-- TRUE MATCH: Strong fit for 0-1/greenfield, founding TPM/Product Ops, operating model transformation, SDLC/PDLC improvement, AI adoption/enablement
+- TRUE MATCH: Strong fit for 0-1/greenfield, founding TPM/Product Ops, operating model transformation, SDLC/PDLC improvement, AI adoption/enablement. BOOST to true_match for legal-tech roles: "legal tech" + SaaS; "evidence management" + ("legal" or "litigation" or "discovery"); "case management" + software; "legal AI" or "LegalAI"
 - MONITOR: Partial fit, some good signals but missing key elements
-- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector, employer Remote Hunter, hybrid/onsite requirements (e.g. "3 days per week in office", "hybrid onsite", "onsite in [city]"), posted salary significantly below candidate minimum (see profile), large enterprise/big tech (Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM, etc.) — EXCEPT Netflix, Zillow (see profile), reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply), job description includes "No longer accepting applications" (role is closed). ALSO REJECT any role that matches the patterns in "Learned from your feedback" above — apply those patterns even when the job has other positive signals.
+- REJECT: Infrastructure, platform, architecture, migrations, SRE/DevOps, implementation, onboarding, professional services, compliance/regulatory/legal/GRC, defense/military, crypto/blockchain/Web3, government sector, employer Remote Hunter, hybrid/onsite requirements (e.g. "3 days per week in office", "hybrid onsite", "onsite in [city]"), posted salary significantly below candidate minimum (see profile), large enterprise/big tech (Microsoft, Google, Amazon, Oracle, Meta, Apple, Salesforce, IBM, etc.) — the ONLY exceptions are those explicitly listed in the profile under EXCEPT or in "Learned from your feedback" Exceptions; never infer or add others, reposted jobs (e.g. "Reposted 3 days ago" in location/date — too late to apply), job description includes "No longer accepting applications" (role is closed), ("video security" or "video analytics") combined with any of: public safety, surveillance, threat detection, law enforcement, emergency communications. ALSO REJECT any role that matches the patterns in "Learned from your feedback" above — apply those patterns even when the job has other positive signals.
 
 Jobs to analyze:
-{jobs}
+{jobs_text}
 
 Return ONLY valid JSON in this EXACT format:
 {{
@@ -85,10 +101,11 @@ Return ONLY valid JSON in this EXACT format:
 
 IMPORTANT:
 - bucket: MUST be exactly "true_match", "monitor", or "reject"
-- why: array of 2-4 strings explaining the decision
+- why: array of 2-4 strings — cite the SPECIFIC rule and evidence from the job (e.g. "Hybrid 5 days onsite in Seattle/SF" or "Salary $180–230k matches profile"). Do NOT use generic reasons like "no job description" or "no salary" if the job clearly contains that information.
 - what_to_do_next: short action recommendation
 - Put ALL jobs into one of the three buckets (no numeric scoring)
 - Entity rules override category rules: e.g. "reject large enterprises" (category) vs "Netflix is exception" (entity) — for Netflix, the entity exception wins
+- CRITICAL — Large enterprise rule: If a company is a large enterprise/big tech, you MUST REJECT it unless it is explicitly listed in the profile's EXCEPT list or in "Learned from your feedback" Exceptions. Do NOT infer, assume, or add any company as an exception. No exceptions to the exceptions list.
 - If a job matches a rejection pattern in "Learned from your feedback" (e.g. project-level not program-level, hands-on data flows/SQL/JSON), REJECT it — do not override with positive signals like salary or AI focus
 """
 
@@ -96,7 +113,7 @@ IMPORTANT:
 def rank_jobs(jobs: list[Job]) -> tuple[AgentDigest, str]:
     """
     Score jobs via LLM, return AgentDigest and raw response.
-    Retries on invalid JSON; falls back to rejects if retry fails (see HANDOFF_V2).
+    Retries on invalid JSON; falls back to rejects if retry fails (see README fetch/score contract).
     """
     MAX_JOBS_PER_LLM_CALL = 10
     MAX_JOB_DESCRIPTION_CHARS = 6000

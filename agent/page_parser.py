@@ -1,9 +1,28 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Tuple
 
 from bs4 import BeautifulSoup
+
+# Generic page titles (Gem, etc.) that don't convey the real role
+GENERIC_TITLES = {"work with us!", "join our team!", "careers", "open roles", "job opportunities"}
+
+
+def html_to_plain_text(text: str) -> str:
+    """
+    Strip HTML tags and normalize whitespace for sheet storage and scoring.
+    JSON-LD JobPosting descriptions (Ashby, etc.) often contain HTML.
+    """
+    if not text:
+        return ""
+    t = text.strip()
+    if "<" in t and ">" in t:
+        t = " ".join(BeautifulSoup(t, "html.parser").get_text(" ", strip=True).split())
+    else:
+        t = " ".join(t.split())
+    return t
 
 
 def _parse_linkedin_title(title: str) -> Tuple[str, str, str]:
@@ -37,6 +56,41 @@ def _parse_linkedin_title(title: str) -> Tuple[str, str, str]:
     return company, role_title, location
 
 
+def _extract_jsonld_job_posting(soup: BeautifulSoup) -> Tuple[str, str, str, str] | None:
+    """
+    Extract job info from JSON-LD JobPosting schema if present.
+    Returns (role_title, company, location, job_description) or None.
+    """
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(script.string or "{}")
+            if isinstance(data, dict):
+                data = [data]
+            if not isinstance(data, list):
+                continue
+            for item in data:
+                if isinstance(item, dict) and item.get("@type") == "JobPosting":
+                    title = item.get("title") or ""
+                    desc = item.get("description") or ""
+                    org = item.get("hiringOrganization", {})
+                    company = org.get("name", "") if isinstance(org, dict) else ""
+                    loc = item.get("jobLocation", {})
+                    if isinstance(loc, dict):
+                        location = loc.get("address", {})
+                        if isinstance(location, dict):
+                            location = location.get("addressLocality", "") or ""
+                        else:
+                            location = ""
+                    else:
+                        location = ""
+                    if title or desc:
+                        plain = html_to_plain_text(str(desc))[:6000]
+                        return (title.strip(), company.strip(), location.strip(), plain)
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return None
+
+
 def extract_job_info(html: str) -> Tuple[str, str, str, str]:
     """
     Extract minimal job information from HTML.
@@ -59,18 +113,42 @@ def extract_job_info(html: str) -> Tuple[str, str, str, str]:
         fetch to be considered successful. Empty results should be marked as parse_empty.
     """
     soup = BeautifulSoup(html, "html.parser")
-    
+
+    # Try JSON-LD JobPosting first (reliable for Gem and many ATS)
+    jsonld = _extract_jsonld_job_posting(soup)
+    if jsonld:
+        return jsonld
+
     # Extract title from <title> tag
     title = (soup.title.get_text(strip=True) if soup.title else "").strip()
-    
     company, role_title, location = _parse_linkedin_title(title)
-    
-    # Extract description: concatenate visible text from main/article/body
-    main = soup.find("main") or soup.find("article") or soup.body
+
+    # Use first h1 for role when title is generic (Gem uses "Work with us!")
+    if role_title.lower().strip() in GENERIC_TITLES:
+        h1 = soup.find("h1")
+        if h1 and h1.get_text(strip=True):
+            role_title = h1.get_text(strip=True)
+
+    # Extract description: main/article/body, then fallbacks
+    main = soup.find("main") or soup.find(attrs={"role": "main"}) or soup.find("article") or soup.body
     desc = ""
     if main:
         desc = " ".join(main.get_text(" ", strip=True).split())
-        # Bound to 6000 chars for sheet compatibility and reasonable summary size
-        desc = desc[:6000]
-    
+
+    # Fallback: look for job description containers (Gem, Darwinbox, etc.)
+    if not desc or len(desc) < 100:
+        for sel in (
+            soup.find(class_=re.compile(r"job-description|job-details|description", re.I)),
+            soup.find(id=re.compile(r"job-description|description", re.I)),
+            soup.find(attrs={"data-testid": re.compile(r"job|description", re.I)}),
+        ):
+            if sel:
+                desc = " ".join(sel.get_text(" ", strip=True).split())
+                if len(desc) >= 100:
+                    break
+
+    if not desc and soup.body:
+        desc = " ".join(soup.body.get_text(" ", strip=True).split())
+
+    desc = html_to_plain_text(desc)[:6000]
     return role_title, company, location, desc

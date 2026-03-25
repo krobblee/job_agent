@@ -1,0 +1,19 @@
+---
+description: Always ask before adding to or changing architecture — never decide on your own
+alwaysApply: true
+---
+
+# Architecture Decisions
+
+**Never add to or change architecture without asking first.**
+
+Before adding, changing, or proposing any of the following, state what you're considering and ask for approval:
+
+- **New dependencies** — Playwright, libraries, packages
+- **New modules or components** — discovery sources, fetchers, pipelines
+- **New files or structural changes** — scripts, config, schema
+- **New patterns or approaches** — browser automation, API changes, data flow
+
+Do not assume. Do not implement "obvious" fixes. Propose and wait for explicit approval.
+
+**Exception:** If the user explicitly says "add it," "implement it," or "go ahead" after you've stated the plan, then proceed.

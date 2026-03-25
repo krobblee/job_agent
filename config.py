@@ -23,6 +23,8 @@ if not SHEET_ID:
 # Worksheet (tab) names
 EMAIL_WORKSHEET = os.getenv("EMAIL_WORKSHEET", "Email")
 AGGREGATOR_WORKSHEET = os.getenv("AGGREGATOR_WORKSHEET", "Aggregator")
+COMPANIES_LIST_WORKSHEET = os.getenv("COMPANIES_LIST_WORKSHEET", "Company List")
+COMPANIES_JOBS_WORKSHEET = os.getenv("COMPANIES_JOBS_WORKSHEET", "Company Jobs")
 
 # Aggregator discovery: aggregator URLs (one per line)
 STARTUP_URLS_PATH = os.getenv("STARTUP_URLS_PATH", "data/Startup_URLs.txt")

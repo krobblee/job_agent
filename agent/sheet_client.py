@@ -134,11 +134,8 @@ class SheetClient:
                     index[key + "/"] = row_num
         return index
 
-    def append_row_dict(self, row: Dict[str, Any]) -> None:
-        header = self.get_header()
-        if not header:
-            raise ValueError("Sheet header row is empty; cannot append.")
-
+    def _row_dict_to_values(self, row: Dict[str, Any], header: List[str]) -> List[str]:
+        """Convert a row dict to a list of values in header order."""
         def _get_val(col: str) -> str:
             v = row.get(col)
             if v is not None:
@@ -146,13 +143,60 @@ class SheetClient:
             alt = (col or "").strip().lower().replace(" ", "_")
             return row.get(alt, "")
 
-        out = []
-        for col in header:
-            val = _get_val(col)
-            out.append("" if val is None else str(val))
-        # table_range='A1' forces append to start at column A; without it, the Sheets API
-        # may detect a "table" starting at the first column with data (e.g. O) and write there.
+        return ["" if (v := _get_val(col)) is None else str(v) for col in header]
+
+    def append_row_dict(self, row: Dict[str, Any]) -> None:
+        """Append a single row. For many rows, use append_rows_dict to avoid rate limits."""
+        header = self.get_header()
+        if not header:
+            raise ValueError("Sheet header row is empty; cannot append.")
+        out = self._row_dict_to_values(row, header)
         self._ws.append_row(out, value_input_option="RAW", table_range="A1")
+
+    def append_rows_dict(self, rows: List[Dict[str, Any]]) -> None:
+        """Append multiple rows in one API call to avoid Sheets write quota limits."""
+        if not rows:
+            return
+        header = self.get_header()
+        if not header:
+            raise ValueError("Sheet header row is empty; cannot append.")
+        values = [self._row_dict_to_values(row, header) for row in rows]
+        self._ws.append_rows(values, value_input_option="RAW", table_range="A1")
+
+    def _contiguous_row_ranges_desc(self, row_numbers: List[int]) -> List[tuple[int, int]]:
+        """
+        Merge 1-based row indices into inclusive (start, end) ranges.
+        Ranges are ordered by descending end row so deleting highest rows first keeps indices valid.
+        Row 1 (header) is never included.
+        """
+        rows = sorted({r for r in row_numbers if isinstance(r, int) and r >= 2})
+        if not rows:
+            return []
+        runs: List[tuple[int, int]] = []
+        start = end = rows[0]
+        for r in rows[1:]:
+            if r == end + 1:
+                end = r
+            else:
+                runs.append((start, end))
+                start = end = r
+        runs.append((start, end))
+        runs.sort(key=lambda t: t[1], reverse=True)
+        return runs
+
+    def delete_rows_at(self, row_numbers: List[int]) -> int:
+        """
+        Delete 1-based sheet rows. Contiguous rows use one API call each range.
+        Never deletes row 1. Invalidates header cache.
+        """
+        ranges = self._contiguous_row_ranges_desc(row_numbers)
+        deleted = 0
+        for start, end in ranges:
+            self._ws.delete_rows(start, end)
+            deleted += end - start + 1
+        if ranges:
+            self._header_cache = None
+        return deleted
 
     def update_row_cells(self, row_number: int, updates: Dict[str, Any]) -> None:
         if not self.get_header():

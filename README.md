@@ -1,6 +1,6 @@
 # Job Agent
 
-A job-search agent that ingests jobs from Gmail and startup aggregators (e.g. topstartups.io), deduplicates and tracks postings via a Google Sheet, fetches and parses job pages, and scores eligible roles against a candidate profile. Supports two pipelines: **Email** (Gmail job alerts) and **Aggregator** (scraping + Swooped).
+A job-search agent that ingests jobs from Gmail, startup aggregators (e.g. topstartups.io), and curated company job boards, deduplicates and tracks postings via a Google Sheet, fetches and parses job pages, and scores eligible roles against a candidate profile. Supports three pipelines: **Email** (Gmail job alerts), **Aggregator** (scraping + Swooped), and **Companies** (Company List with hosted ATS board URLs → Company Jobs).
 
 The system is resumable, inspectable, and safe to run repeatedly without silent drops or duplicate work.
 
@@ -53,6 +53,8 @@ AGGREGATOR_SNAPSHOT_DIR=data/snapshots
 
 For Aggregator discovery, copy `data/Startup_URLs.example.txt` to `data/Startup_URLs.txt` and `data/Swooped_URLs.example.txt` to `data/Swooped_URLs.txt`, then add your URLs. Use job listing pages that link directly to ATS job pages.
 
+**Companies pipeline:** Create two tabs: **Company List** and **Company Jobs** (see SETUP). **Important:** In `career_site_url`, paste the **direct hosted job board URL** where open roles are listed—the ATS page (Ashby, Greenhouse, Lever, Gem, Workday, Darwinbox, etc.), e.g. `https://jobs.ashbyhq.com/yourcompany` or your Greenhouse/Lever board URL. **Do not** use the marketing site’s generic careers page (e.g. `company.com/careers`) as your primary input; those pages often only link to the real board and are harder to scrape reliably. Optionally fill `company_url` with the main website; the agent may use it as a **fallback** if the job board URL fails, but the supported default is: **job board link in `career_site_url`.**
+
 ### Run
 
 ```bash
@@ -62,11 +64,17 @@ python3 run_email.py
 # Aggregator pipeline (Aggregators + Swooped → Sheet → Fetch → Score)
 python3 run_aggregator.py
 
+# Companies pipeline (Company List → job board discovery → Company Jobs → Fetch → Score)
+python3 run_companies.py
+
 # Rescore Email sheet only (no discovery/fetch) — use when profile/config changed
 python3 scripts/rescore.py
 
 # Re-fetch Email sheet (reset fetched → pending, then fetch) — use after parser changes
 python3 scripts/rerun_fetch.py
+
+# Company Jobs only: delete rows scored as reject (keeps sheet to true_match + monitor + pending)
+python3 scripts/prune_company_jobs_rejects.py
 
 # Add feedback for the agent to learn (in Cursor: "add to feedback: I rejected Microsoft")
 python3 scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
@@ -76,7 +84,7 @@ python3 scripts/add_feedback.py "I wouldn't work at Microsoft, it's too big"
 
 ## System overview
 
-Two pipelines share the same Sheet and scoring logic:
+Three pipelines share the same Sheet and scoring logic (separate tabs where noted):
 
 ### Email pipeline (`run_email.py`)
 1. **Discovery** — Gmail job alerts → extract URLs, strip `/comm/` tracking
@@ -88,6 +96,13 @@ Two pipelines share the same Sheet and scoring logic:
 2. **Delta** — Compare vs previous snapshot; only new URLs are "fresh" (posted since last run)
 3. **Storage** — Append new jobs to Aggregator tab
 4. **Fetch** → **Score** — Same as Email
+
+### Companies pipeline (`run_companies.py`)
+1. **Read Company List** — `company`, `company_url`, `career_site_url`, `last_error` (see SETUP for how to fill these)
+2. **Discovery** — Scrape the **job board** URL in `career_site_url` and extract individual job posting URLs. If that fails, optionally fall back to `company_url` to find a careers link (less reliable—prefer putting the board URL directly in `career_site_url`)
+3. **Storage** — Append new jobs to Company Jobs tab (dedupe by job_url)
+4. **Fetch** → **Score** — Same as Email/Aggregator
+5. **Prune** — After scoring, rows with `agent_bucket=reject` are **deleted** from Company Jobs only (true_match, monitor, and pending rows stay). Email and Aggregator tabs are unchanged. Run `python3 scripts/prune_company_jobs_rejects.py` anytime to clean rejects without a full pipeline run.
 
 ### Shared
 - **Storage & resume** — Google Sheet is the single source of truth; explicit fetch_status lifecycle
@@ -102,12 +117,14 @@ Two pipelines share the same Sheet and scoring logic:
 job-agent/
 ├── run_email.py               # Email pipeline (Gmail → Fetch → Score)
 ├── run_aggregator.py          # Aggregator pipeline (Aggregators + Swooped → Fetch → Score)
+├── run_companies.py           # Companies pipeline (Company List → job board → Fetch → Score)
 ├── config.py                  # Settings, PROFILE, worksheet names
 ├── models.py                  # Job, ScoredJob, AgentDigest
 ├── requirements.txt
 ├── .env
 │
 ├── agent/
+│   ├── company_discovery.py   # Scrape ATS job boards / career pages, extract job URLs
 │   ├── discovery.py           # Gmail job discovery
 │   ├── feedback_parser.py     # Parse free-form feedback into FeedbackPreference
 │   ├── feedback_store.py      # Load/save learned_preferences.json
@@ -129,6 +146,7 @@ job-agent/
 │   ├── add_feedback.py    # Add feedback: parse → dedupe → store
 │   ├── aggregator_snapshot.py
 │   ├── aggregator_upsert.py
+│   ├── company_upsert.py      # Append Company Jobs from discovery
 │   ├── normalize_comm_urls.py
 │   ├── rerun_fetch.py     # Reset fetched rows and re-fetch (e.g. after parser changes)
 │   ├── rescore.py         # Rescore Email sheet (no discovery/fetch)
@@ -216,11 +234,11 @@ Email-derived context must not be scored once job-page fetching is implemented.
 
 The Google Sheet is the system’s persistent data model and source of truth.
 
-The Sheet has two tabs: **Email** (Gmail) and **Aggregator** (scraping + Swooped). Each row = one job URL. Aggregator uses `first_seen` and `company` (board slug); Email uses `date_received`, `last_seen_at`.
+The Sheet has tabs: **Email** (Gmail), **Aggregator** (scraping + Swooped), **Company List** (your curated companies—**put the hosted job board URL in `career_site_url`**), **Company Jobs** (output from Company List). Each job row = one job URL. Aggregator uses `first_seen` and `company` (board slug); Email uses `date_received`, `last_seen_at`.
 
 **Discovery & Tracking:**
 - `job_url` - Canonicalized job URL (tracking params stripped)
-- `source` - Where the URL was discovered (gmail, greenhouse, swooped)
+- `source` - Where the URL was discovered (e.g. gmail, greenhouse, swooped, **companies** for Company Jobs)
 - `date_received` - When the URL was first discovered
 - `last_seen_at` - Last time the URL was seen in Gmail query
 
@@ -250,13 +268,15 @@ The Sheet has two tabs: **Email** (Gmail) and **Aggregator** (scraping + Swooped
 
 **Aggregator** (`run_aggregator.py`): Scrape aggregators + Swooped → delta vs previous snapshot → append new jobs → fetch → score. Run every 48h to capture fresh postings.
 
-Both pipelines share fetch and score logic. The system is **resumable** — safe to run repeatedly.
+**Companies** (`run_companies.py`): Company List (**`career_site_url` = hosted job board**) → discover job URLs → Company Jobs tab → fetch → score → prune rejects. See SETUP for tab setup.
+
+All pipelines share fetch and score logic. The system is **resumable** — safe to run repeatedly.
 
 ---
 
 ## Key Features
 
-- **Dual pipelines** — Email (Gmail) and Aggregator (scraping + Swooped); separate tabs, shared fetch/score
+- **Three pipelines** — Email (Gmail), Aggregator (scraping + Swooped), Companies (curated list + job boards); separate tabs where noted, shared fetch/score
 - **Aggregator freshness** — Delta-based discovery (run every 48h; new URLs = fresh jobs)
 - **Profile hard NOs** — Defense, crypto, government excluded from true_match
 - **URL Normalization** — Strips `/comm/` from LinkedIn URLs

@@ -22,6 +22,10 @@ data/Startup_URLs.txt
 data/Swooped_URLs.txt
 LEARNING_JOURNAL.md
 
+# Private handoff / continuation prompts (local only; not published)
+docs/CONTINUATION_PROMPT*
+docs/HANDOFF_*
+
 # BFG / history cleanup
 replacements.txt
 bfg.jar
